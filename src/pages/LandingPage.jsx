@@ -115,7 +115,7 @@ export default function LandingPage() {
 
               {/* Main Headline - Gigante e Desconstruído */}
               <h1 className="relative">
-                <div className="text-[clamp(3rem,12vw,10rem)] font-black leading-[0.9] tracking-tighter">
+                <div className="text-[clamp(2.5rem,10vw,10rem)] font-black leading-[0.95] tracking-tighter">
                   <span className="block text-white" style={{ 
                     textShadow: '0 0 80px rgba(16, 185, 129, 0.5)'
                   }}>
@@ -124,14 +124,14 @@ export default function LandingPage() {
                   <span className="block bg-gradient-to-r from-green-400 via-emerald-500 to-green-600 bg-clip-text text-transparent">
                     DIGITAL
                   </span>
-                  <span className="block text-white/20 text-[clamp(2rem,8vw,6rem)]">
+                  <span className="block text-white/20 text-[clamp(1.5rem,6vw,6rem)]">
                     PARA BARBEARIAS
                   </span>
                 </div>
               </h1>
 
               {/* Subtitle */}
-              <p className="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto font-light">
+              <p className="text-base md:text-xl lg:text-2xl text-gray-400 max-w-3xl mx-auto font-light px-4">
                 Esqueça planilhas, cadernos e WhatsApp. 
                 <span className="text-white font-semibold"> Gerencie tudo em um só lugar</span> com tecnologia de ponta.
               </p>
@@ -648,8 +648,8 @@ export default function LandingPage() {
           {/* Background Effect */}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-green-500/5 to-transparent" />
           
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <h2 className="text-5xl md:text-7xl font-black text-white mb-6 leading-tight">
+          <div className="max-w-4xl mx-auto text-center relative z-10 px-4">
+            <h2 className="text-[clamp(2rem,8vw,4.5rem)] md:text-7xl font-black text-white mb-6 leading-tight">
               Pronto para
               <span className="block bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
                 REVOLUCIONAR
@@ -657,17 +657,17 @@ export default function LandingPage() {
               sua barbearia?
             </h2>
             
-            <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
+            <p className="text-base md:text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
               Junte-se a centenas de barbeiros que já transformaram seus negócios com o Brio App
             </p>
 
             <button
               onClick={() => navigate('/register')}
-              className="group relative px-12 py-6 bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold rounded-2xl text-xl overflow-hidden hover:scale-105 transition-all shadow-2xl shadow-green-500/50"
+              className="group relative px-8 md:px-12 py-4 md:py-6 bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold rounded-2xl text-lg md:text-xl overflow-hidden hover:scale-105 transition-all shadow-2xl shadow-green-500/50 w-full sm:w-auto"
             >
-              <span className="relative z-10 flex items-center gap-3">
+              <span className="relative z-10 flex items-center justify-center gap-3">
                 Começar Grátis Agora
-                <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                <ArrowRight className="w-5 md:w-6 h-5 md:h-6 group-hover:translate-x-2 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
