@@ -16,6 +16,7 @@ import BarbershopPublicPage from './pages/BarbershopPublicPage'
 import EquipePage from './pages/EquipePage'
 import AgendaPage from './pages/AgendaPage'
 import FinanceiroPage from './pages/FinanceiroPage'
+import AssinantesPage from './pages/AssinantesPage'
 import ClientesCRM from './pages/ClientesCRM'
 import SuperAdminPage from './pages/SuperAdminPage'
 import SuperAdminLogin from './pages/SuperAdminLogin'
@@ -157,6 +158,7 @@ function App() {
           <Route path="operacional" element={<OperacionalPage />} />
           <Route path="equipe" element={<EquipePage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
+          <Route path="assinantes" element={<AssinantesPage />} />
         </Route>
         
         {/* Rota Super Admin - Protegida */}

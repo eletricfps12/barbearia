@@ -361,6 +361,33 @@ export default function AgendaPage() {
   }
 
   /**
+   * Mark appointment as subscriber visit (no revenue counted)
+   */
+  const markAsSubscriber = async (appointmentId) => {
+    try {
+      setUpdatingStatus(appointmentId)
+
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ 
+          is_subscriber: true,
+          status: 'completed'
+        })
+        .eq('id', appointmentId)
+
+      if (updateError) throw updateError
+
+      // Reload appointments
+      await fetchAppointments()
+    } catch (err) {
+      console.error('Error marking as subscriber:', err)
+      setError('Erro ao marcar como assinante')
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
+  /**
    * Navigate to previous day
    */
   const goToPreviousDay = () => {
@@ -926,6 +953,13 @@ export default function AgendaPage() {
                               <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.className}`}>
                                 {statusBadge.label}
                               </span>
+
+                              {/* Subscriber Badge */}
+                              {appointment.is_subscriber && (
+                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                  ⭐ Assinante
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -941,6 +975,14 @@ export default function AgendaPage() {
                                     className="text-green-400 bg-green-400/10 hover:bg-green-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
                                   >
                                     {isUpdating ? '...' : 'Concluir'}
+                                  </button>
+                                  <button
+                                    onClick={() => markAsSubscriber(appointment.id)}
+                                    disabled={isUpdating}
+                                    type="button"
+                                    className="text-indigo-400 bg-indigo-400/10 hover:bg-indigo-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                                  >
+                                    {isUpdating ? '...' : 'Assinante'}
                                   </button>
                                   <button
                                     onClick={() => updateAppointmentStatus(appointment.id, 'no_show')}
@@ -989,10 +1031,15 @@ export default function AgendaPage() {
                   currency: 'BRL' 
                 }).format(
                   appointments
-                    .filter(apt => apt.status === 'completed')
+                    .filter(apt => apt.status === 'completed' && !apt.is_subscriber)
                     .reduce((sum, apt) => sum + (apt.services?.price || 0), 0)
                 )}
               </span> (concluídos)
+              {appointments.some(apt => apt.is_subscriber) && (
+                <span className="ml-2 text-xs text-indigo-400">
+                  • Assinantes não contabilizados
+                </span>
+              )}
             </div>
           </div>
         </div>

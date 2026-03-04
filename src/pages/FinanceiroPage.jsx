@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plus, TrendingUp, TrendingDown, DollarSign, X, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, DollarSign, X, Calendar, ArrowUpRight, ArrowDownRight, List } from 'lucide-react'
 import { showToast } from '../components/Toast'
 import { 
-  BarChart, Bar, PieChart, Pie, Cell, 
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, Area, AreaChart,
   ResponsiveContainer, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend 
 } from 'recharts'
@@ -22,6 +22,9 @@ export default function FinanceiroPage() {
   // Filter states
   const [selectedPeriod, setSelectedPeriod] = useState('current_month')
   const [selectedBarber, setSelectedBarber] = useState('all')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false)
   
   // Data states
   const [barbershopId, setBarbershopId] = useState(null)
@@ -50,6 +53,12 @@ export default function FinanceiroPage() {
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false)
   const [selectedBarberForPayout, setSelectedBarberForPayout] = useState(null)
   const [cashBalance, setCashBalance] = useState(0)
+  const [isRevenueDetailOpen, setIsRevenueDetailOpen] = useState(false)
+  const [revenueDetails, setRevenueDetails] = useState({
+    appointments: [],
+    manualTransactions: [],
+    subscriptions: []
+  })
   
   // Form states
   const [formData, setFormData] = useState({
@@ -86,7 +95,7 @@ export default function FinanceiroPage() {
     if (barbershopId) {
       fetchFinancialData()
     }
-  }, [barbershopId, selectedPeriod, selectedBarber])
+  }, [barbershopId, selectedPeriod, selectedBarber, customStartDate, customEndDate])
 
   const fetchBarbershopId = async () => {
     try {
@@ -165,6 +174,18 @@ export default function FinanceiroPage() {
       case 'last_month':
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
         endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+        break
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          startDate = new Date(customStartDate)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(customEndDate)
+          endDate.setHours(23, 59, 59, 999)
+        } else {
+          // Se não tiver datas personalizadas, usa mês atual
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+        }
         break
       default:
         startDate = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -301,10 +322,10 @@ export default function FinanceiroPage() {
       const barbersList = barbersData || []
       setBarbers(barbersList) // Update state for other uses
 
-      // 1. Fetch completed appointments
+      // 1. Fetch completed appointments (excluding subscribers if column exists)
       let appointmentsQuery = supabase
         .from('appointments')
-        .select('start_time, services(price), barber_id')
+        .select('start_time, services(price), barber_id, is_subscriber')
         .eq('barbershop_id', barbershopId)
         .eq('status', 'completed')
         .gte('start_time', startDate.toISOString())
@@ -314,12 +335,33 @@ export default function FinanceiroPage() {
         appointmentsQuery = appointmentsQuery.eq('barber_id', selectedBarber)
       }
 
-      const { data: appointmentsData, error: appointmentsError } = await appointmentsQuery
+      let { data: appointmentsData, error: appointmentsError } = await appointmentsQuery
+      
+      // If column doesn't exist yet, try without it
+      if (appointmentsError && appointmentsError.message?.includes('is_subscriber')) {
+        appointmentsQuery = supabase
+          .from('appointments')
+          .select('start_time, services(price), barber_id')
+          .eq('barbershop_id', barbershopId)
+          .eq('status', 'completed')
+          .gte('start_time', startDate.toISOString())
+          .lte('start_time', endDate.toISOString())
+
+        if (selectedBarber !== 'all') {
+          appointmentsQuery = appointmentsQuery.eq('barber_id', selectedBarber)
+        }
+
+        const result = await appointmentsQuery
+        appointmentsData = result.data
+        appointmentsError = result.error
+      }
+
       if (appointmentsError) throw appointmentsError
 
-      const appointmentsIncome = (appointmentsData || []).reduce(
-        (sum, apt) => sum + (apt.services?.price || 0), 0
-      )
+      // Exclude subscribers from revenue calculation (if column exists)
+      const appointmentsIncome = (appointmentsData || [])
+        .filter(apt => !apt.is_subscriber)
+        .reduce((sum, apt) => sum + (apt.services?.price || 0), 0)
 
       // 2. Fetch manual transactions
       let transactionsQuery = supabase
@@ -587,6 +629,78 @@ export default function FinanceiroPage() {
     }
   }
 
+  const fetchRevenueDetails = async () => {
+    try {
+      const { startDate, endDate } = getDateRange()
+
+      // 1. Buscar agendamentos completos com detalhes
+      let appointmentsQuery = supabase
+        .from('appointments')
+        .select('*, services(name, price), barbers(name), is_subscriber')
+        .eq('barbershop_id', barbershopId)
+        .eq('status', 'completed')
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
+        .order('start_time', { ascending: false })
+
+      if (selectedBarber !== 'all') {
+        appointmentsQuery = appointmentsQuery.eq('barber_id', selectedBarber)
+      }
+
+      let { data: appointmentsData, error: appointmentsError } = await appointmentsQuery
+      
+      // Fallback se coluna is_subscriber não existir
+      if (appointmentsError && appointmentsError.message?.includes('is_subscriber')) {
+        appointmentsQuery = supabase
+          .from('appointments')
+          .select('*, services(name, price), barbers(name)')
+          .eq('barbershop_id', barbershopId)
+          .eq('status', 'completed')
+          .gte('start_time', startDate.toISOString())
+          .lte('start_time', endDate.toISOString())
+          .order('start_time', { ascending: false })
+
+        if (selectedBarber !== 'all') {
+          appointmentsQuery = appointmentsQuery.eq('barber_id', selectedBarber)
+        }
+
+        const result = await appointmentsQuery
+        appointmentsData = result.data
+        appointmentsError = result.error
+      }
+
+      if (appointmentsError) throw appointmentsError
+
+      // 2. Buscar transações manuais
+      let transactionsQuery = supabase
+        .from('financial_transactions')
+        .select('*, barbers(name)')
+        .eq('barbershop_id', barbershopId)
+        .eq('type', 'income')
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+
+      if (selectedBarber !== 'all') {
+        transactionsQuery = transactionsQuery.eq('barber_id', selectedBarber)
+      }
+
+      const { data: transactionsData, error: transactionsError } = await transactionsQuery
+      if (transactionsError) throw transactionsError
+
+      setRevenueDetails({
+        appointments: appointmentsData || [],
+        manualTransactions: transactionsData || [],
+        subscriptions: [] // Removido - assinantes não aparecem mais no financeiro
+      })
+
+      setIsRevenueDetailOpen(true)
+    } catch (err) {
+      console.error('Error fetching revenue details:', err)
+      showToast.error('Erro ao carregar detalhes')
+    }
+  }
+
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -657,14 +771,39 @@ export default function FinanceiroPage() {
       <div className="flex flex-wrap gap-3">
         <select
           value={selectedPeriod}
-          onChange={(e) => setSelectedPeriod(e.target.value)}
+          onChange={(e) => {
+            setSelectedPeriod(e.target.value)
+            setShowCustomDatePicker(e.target.value === 'custom')
+          }}
           className="px-4 py-2 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="today">Hoje</option>
           <option value="this_week">Esta Semana</option>
           <option value="current_month">Mês Atual</option>
           <option value="last_month">Mês Anterior</option>
+          <option value="custom">📅 Personalizado</option>
         </select>
+
+        {/* Custom Date Picker */}
+        {showCustomDatePicker && (
+          <>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="px-4 py-2 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Data inicial"
+            />
+            <span className="flex items-center text-gray-500 dark:text-gray-400">até</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="px-4 py-2 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Data final"
+            />
+          </>
+        )}
 
         <select
           value={selectedBarber}
@@ -686,8 +825,17 @@ export default function FinanceiroPage() {
         <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Faturamento</span>
-            <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-lg">
-              <DollarSign className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchRevenueDetails}
+                className="p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                title="Ver detalhamento"
+              >
+                <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </button>
+              <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-lg">
+                <DollarSign className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
           </div>
           <div className="flex items-end justify-between">
@@ -809,55 +957,91 @@ export default function FinanceiroPage() {
 
       {/* Charts Row - Minimalista e Moderno */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bar Chart - Revenue (Minimalista) */}
+        {/* Line Chart - Revenue Evolution (Moderno e Tecnológico) */}
         <div className="lg:col-span-2 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Evolução Diária</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evolução de Receita</h3>
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+              <span>Receita</span>
+            </div>
+          </div>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="#374151" 
+                  opacity={0.1}
+                  vertical={false}
+                />
                 <XAxis 
                   dataKey="date" 
-                  stroke="#9ca3af"
+                  stroke="#6b7280"
                   tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  axisLine={false}
+                  axisLine={{ stroke: '#374151', opacity: 0.2 }}
                   tickLine={false}
                 />
                 <YAxis 
-                  stroke="#9ca3af"
+                  stroke="#6b7280"
                   tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  axisLine={false}
+                  axisLine={{ stroke: '#374151', opacity: 0.2 }}
                   tickLine={false}
+                  tickFormatter={(value) => `R$ ${value}`}
                 />
                 <Tooltip 
-                  cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
+                  cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '5 5' }}
                   contentStyle={{
-                    backgroundColor: 'rgba(31, 41, 55, 0.95)',
-                    border: 'none',
+                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
                     borderRadius: '12px',
-                    padding: '12px',
-                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                    padding: '12px 16px',
+                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
+                    backdropFilter: 'blur(10px)'
                   }}
-                  labelStyle={{ color: '#e5e7eb', fontWeight: '600', marginBottom: '4px' }}
-                  itemStyle={{ color: '#60a5fa', fontSize: '14px' }}
-                  formatter={(value) => formatCurrency(value)}
+                  labelStyle={{ color: '#e5e7eb', fontWeight: '600', marginBottom: '8px', fontSize: '13px' }}
+                  itemStyle={{ color: '#60a5fa', fontSize: '14px', fontWeight: '500' }}
+                  formatter={(value) => [`${formatCurrency(value)}`, 'Receita']}
                 />
-                <Bar 
+                <Area 
+                  type="monotone"
                   dataKey="receita" 
-                  fill="#3b82f6" 
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={40}
+                  stroke="#3b82f6"
+                  strokeWidth={3}
+                  fill="url(#colorReceita)"
+                  animationDuration={1500}
+                  animationEasing="ease-in-out"
+                  dot={{ 
+                    fill: '#3b82f6', 
+                    strokeWidth: 2, 
+                    stroke: '#1e40af',
+                    r: 4
+                  }}
+                  activeDot={{ 
+                    r: 6, 
+                    fill: '#60a5fa',
+                    stroke: '#1e40af',
+                    strokeWidth: 2
+                  }}
                 />
-              </BarChart>
+              </AreaChart>
             </ResponsiveContainer>
           ) : (
             <div className="h-[280px] flex items-center justify-center text-gray-400 dark:text-gray-600">
               <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
                   </svg>
                 </div>
-                <p className="text-sm">Sem dados para exibir</p>
+                <p className="text-sm font-medium">Sem dados para exibir</p>
+                <p className="text-xs text-gray-500 mt-1">Adicione transações para ver o gráfico</p>
               </div>
             </div>
           )}
@@ -1245,6 +1429,11 @@ export default function FinanceiroPage() {
                           </span>
                         )}
                       </div>
+                      {transaction.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
+                          {transaction.description}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-xs text-gray-500 dark:text-gray-500">
                           {new Date(transaction.date).toLocaleDateString('pt-BR')}
@@ -1267,6 +1456,101 @@ export default function FinanceiroPage() {
                       : 'text-red-600 dark:text-red-400'
                   }`}>
                     {transaction.type === 'income' ? '+' : '-'} {formatCurrency(parseFloat(transaction.amount))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recurring Transactions Section */}
+      <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl shadow-sm dark:shadow-none">
+        <div className="p-6 border-b border-gray-200 dark:border-[#2A2A2A]">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Transações Recorrentes</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gerencie receitas e despesas que se repetem todo mês</p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Automático</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {transactions.filter(t => t.is_recurring).length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                <svg className="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 font-medium">Nenhuma transação recorrente</p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Cadastre receitas ou despesas que se repetem mensalmente</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {transactions.filter(t => t.is_recurring).map((transaction) => (
+                <div
+                  key={transaction.id}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-500/5 to-transparent dark:from-indigo-500/10 rounded-xl border border-indigo-200 dark:border-indigo-500/20"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className={`p-2.5 rounded-lg ${
+                      transaction.type === 'income'
+                        ? 'bg-green-100 dark:bg-green-500/10'
+                        : 'bg-red-100 dark:bg-red-500/10'
+                    }`}>
+                      {transaction.type === 'income' ? (
+                        <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {transaction.category}
+                        </h4>
+                        <span className="text-[10px] uppercase font-bold tracking-wider bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded">
+                          {transaction.type === 'income' ? 'Receita' : 'Despesa'}
+                        </span>
+                      </div>
+                      {transaction.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
+                          {transaction.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                          Todo dia {transaction.recurrence_day || 1} do mês
+                        </p>
+                        {transaction.barbers && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {transaction.barbers.name}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className={`text-lg font-bold ${
+                      transaction.type === 'income'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {transaction.type === 'income' ? '+' : '-'} {formatCurrency(parseFloat(transaction.amount))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1680,6 +1964,169 @@ export default function FinanceiroPage() {
                   disabled={isSaving}
                 >
                   {isSaving ? 'Processando...' : 'Confirmar Repasse'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revenue Detail Modal */}
+      {isRevenueDetailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="relative bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-4xl border border-gray-200 dark:border-[#2A2A2A] shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalhamento do Faturamento</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{getPeriodLabel()}</p>
+              </div>
+              <button 
+                onClick={() => setIsRevenueDetailOpen(false)} 
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Agendamentos</p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-1">
+                    {formatCurrency(
+                      revenueDetails.appointments
+                        .filter(apt => !apt.is_subscriber)
+                        .reduce((sum, apt) => sum + (apt.services?.price || 0), 0)
+                    )}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    {revenueDetails.appointments.filter(apt => !apt.is_subscriber).length} cortes
+                  </p>
+                </div>
+
+                <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Entradas Manuais</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">
+                    {formatCurrency(
+                      revenueDetails.manualTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+                    )}
+                  </p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {revenueDetails.manualTransactions.length} transações
+                  </p>
+                </div>
+              </div>
+
+              {/* Appointments List */}
+              {revenueDetails.appointments.filter(apt => !apt.is_subscriber).length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Agendamentos Concluídos</h3>
+                  <div className="space-y-2">
+                    {revenueDetails.appointments
+                      .filter(apt => !apt.is_subscriber)
+                      .map((apt) => (
+                        <div
+                          key={apt.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {apt.client_name}
+                            </p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {apt.services?.name} • {apt.barbers?.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                              {new Date(apt.start_time).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                              {formatCurrency(apt.services?.price || 0)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Manual Transactions List */}
+              {revenueDetails.manualTransactions.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Entradas Manuais</h3>
+                  <div className="space-y-2">
+                    {revenueDetails.manualTransactions.map((transaction) => (
+                      <div
+                        key={transaction.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {transaction.category}
+                          </p>
+                          {transaction.description && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {transaction.description}
+                            </p>
+                          )}
+                          {transaction.barbers?.name && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {transaction.barbers.name}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                            {formatCurrency(transaction.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {revenueDetails.appointments.length === 0 && 
+               revenueDetails.manualTransactions.length === 0 && (
+                <div className="text-center py-12">
+                  <DollarSign className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">Nenhuma receita encontrada no período</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 dark:border-[#2A2A2A] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total do Período</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(
+                      revenueDetails.appointments
+                        .filter(apt => !apt.is_subscriber)
+                        .reduce((sum, apt) => sum + (apt.services?.price || 0), 0) +
+                      revenueDetails.manualTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsRevenueDetailOpen(false)}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Fechar
                 </button>
               </div>
             </div>

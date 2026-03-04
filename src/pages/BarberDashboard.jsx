@@ -92,7 +92,8 @@ export default function BarberDashboard() {
       const activeAppointments = appointmentsData.filter(apt => apt.status !== 'cancelled')
 
       activeAppointments.forEach(apt => {
-        if (apt.status === 'confirmed' || apt.status === 'completed') {
+        // Exclude subscribers from revenue if column exists
+        if ((apt.status === 'confirmed' || apt.status === 'completed') && !apt.is_subscriber) {
           count++
           revenue += Number(apt.services.price)
         }
@@ -127,7 +128,7 @@ export default function BarberDashboard() {
 
       const { data, error } = await supabase
         .from('appointments')
-        .select('start_time, services(price)')
+        .select('start_time, services(price), is_subscriber')
         .eq('barbershop_id', barbershopId)
         .eq('status', 'completed')
         .gte('start_time', sevenDaysAgo.toISOString())
@@ -135,7 +136,7 @@ export default function BarberDashboard() {
 
       if (error) throw error
 
-      // Group by day
+      // Group by day (excluding subscribers if column exists)
       const revenueByDay = {}
       for (let i = 0; i < 7; i++) {
         const date = new Date(sevenDaysAgo)
@@ -145,9 +146,12 @@ export default function BarberDashboard() {
       }
 
       data.forEach(apt => {
-        const date = new Date(apt.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-        if (revenueByDay[date] !== undefined) {
-          revenueByDay[date] += Number(apt.services?.price || 0)
+        // Exclude subscribers from revenue calculation if column exists
+        if (!apt.is_subscriber) {
+          const date = new Date(apt.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+          if (revenueByDay[date] !== undefined) {
+            revenueByDay[date] += Number(apt.services?.price || 0)
+          }
         }
       })
 

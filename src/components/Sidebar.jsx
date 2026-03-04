@@ -15,7 +15,8 @@ import {
   HelpCircle,
   Copy,
   Check,
-  X
+  X,
+  CreditCard
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -23,6 +24,7 @@ const navigationItems = [
   { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/admin/agenda', icon: Calendar, label: 'Agenda' },
   { path: '/admin/financeiro', icon: DollarSign, label: 'Financeiro' },
+  { path: '/admin/assinantes', icon: CreditCard, label: 'Assinantes' },
   { path: '/admin/clientes', icon: UserCheck, label: 'Clientes' },
   { path: '/admin/equipe', icon: Users, label: 'Equipe' },
   { path: '/admin/servicos', icon: Scissors, label: 'Serviços' },

@@ -70,9 +70,9 @@ export default function DashboardHome() {
 
       setAppointments(appointmentsData || [])
 
-      // Filtrar apenas confirmados e completos para métricas
+      // Filtrar apenas confirmados e completos para métricas (excluindo assinantes se coluna existir)
       const confirmedAppointments = appointmentsData?.filter(apt => 
-        apt.status === 'confirmed' || apt.status === 'completed'
+        (apt.status === 'confirmed' || apt.status === 'completed') && !apt.is_subscriber
       ) || []
 
       // 4. Calcular receita e lucro
@@ -99,7 +99,10 @@ export default function DashboardHome() {
 
       let occupationRate = 0
       let totalSlots = 0
-      let filledSlots = confirmedAppointments.length
+      // Count all confirmed/completed appointments for occupation (including subscribers)
+      let filledSlots = (appointmentsData?.filter(apt => 
+        apt.status === 'confirmed' || apt.status === 'completed'
+      ) || []).length
 
       if (businessHours && !businessHours.is_closed) {
         // Calcular slots disponíveis (30 min cada)
