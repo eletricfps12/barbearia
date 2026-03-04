@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Validar variáveis de ambiente
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -9,4 +10,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
+// Criar e exportar cliente Supabase configurado
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
