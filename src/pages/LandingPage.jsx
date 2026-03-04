@@ -203,10 +203,10 @@ export default function LandingPage() {
               <div className="relative bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-xl border border-white/10 rounded-[3rem] p-12 overflow-hidden">
                 <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-green-500/10 to-transparent" />
                 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center relative z-10">
                   
                   {/* Text Content */}
-                  <div className="space-y-6">
+                  <div className="space-y-6 px-4 lg:px-0">
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-semibold">
                       <Sparkles className="w-4 h-4" />
                       Experiência do Cliente
@@ -242,9 +242,9 @@ export default function LandingPage() {
                   </div>
 
                   {/* Screenshot - Mockup Style */}
-                  <div className="relative">
+                  <div className="relative flex justify-center lg:justify-end px-4 lg:px-0">
                     {/* Phone Frame */}
-                    <div className="relative mx-auto w-[320px] h-[650px] bg-zinc-950 rounded-[3rem] p-3 shadow-2xl border-8 border-zinc-800 transform hover:scale-105 transition-transform duration-500">
+                    <div className="relative w-[280px] sm:w-[320px] h-[570px] sm:h-[650px] bg-zinc-950 rounded-[3rem] p-3 shadow-2xl border-8 border-zinc-800 transform hover:scale-105 transition-transform duration-500">
                       {/* Notch */}
                       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-950 rounded-b-3xl z-10" />
                       
