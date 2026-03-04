@@ -212,7 +212,7 @@ export default function LandingPage() {
                       Experiência do Cliente
                     </div>
                     
-                    <h3 className="text-5xl font-black text-white leading-tight">
+                    <h3 className="text-[clamp(2rem,8vw,3.5rem)] font-black text-white leading-tight px-4">
                       Agendamento
                       <span className="block bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
                         Online 24/7

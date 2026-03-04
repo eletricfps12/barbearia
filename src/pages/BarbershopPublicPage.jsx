@@ -600,7 +600,7 @@ export default function BarbershopPublicPage() {
                     <img
                       src={barber.avatar_url}
                       alt={barber.name}
-                      className="w-full h-full rounded-full object-cover"
+                      className="w-full h-full rounded-full object-contain bg-[#1A1A1A]"
                     />
                   ) : (
                     <div className="w-full h-full rounded-full bg-[#1A1A1A] flex items-center justify-center">
