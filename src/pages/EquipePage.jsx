@@ -504,7 +504,7 @@ export default function EquipePage() {
 
       {/* Modal - Apple Style */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 overflow-y-auto">
           {/* Backdrop com blur (vidro fosco) */}
           <div 
             className="absolute inset-0 bg-black/60 backdrop-blur-md"
@@ -512,34 +512,34 @@ export default function EquipePage() {
           />
           
           {/* Modal Card */}
-          <div className="relative bg-white/95 dark:bg-[#1A1A1A]/95 backdrop-blur-xl rounded-[2rem] w-full max-w-md border border-white/10 dark:border-white/5 shadow-2xl animate-fade-in">
+          <div className="relative bg-white/95 dark:bg-[#1A1A1A]/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-white/10 dark:border-white/5 shadow-2xl animate-fade-in my-4 max-h-[95vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 pb-4">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="flex items-center justify-between p-4 pb-3">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {editingBarber ? 'Editar Colaborador' : 'Novo Colaborador'}
               </h2>
               <button
                 onClick={closeModal}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all"
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all"
                 disabled={isSaving}
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-5">
+            <form onSubmit={handleSubmit} className="px-4 pb-4 space-y-3">
               {/* Photo Upload - Apple Style */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-3">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
                   Foto de Perfil
                 </label>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   {/* Preview Circle with Camera Overlay */}
                   <div className="relative group">
-                    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-indigo-100 to-indigo-50 dark:from-indigo-900/20 dark:to-indigo-800/20">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-indigo-100 to-indigo-50 dark:from-indigo-900/20 dark:to-indigo-800/20">
                       {previewUrl ? (
                         <img
                           src={previewUrl}
@@ -548,7 +548,7 @@ export default function EquipePage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                          <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
                             {formData.name ? getInitials(formData.name) : '?'}
                           </span>
                         </div>
@@ -556,7 +556,7 @@ export default function EquipePage() {
                     </div>
                     {/* Camera Icon Overlay */}
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -575,21 +575,21 @@ export default function EquipePage() {
                   <div className="flex-1">
                     <label 
                       htmlFor="avatar"
-                      className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-full cursor-pointer transition-colors"
+                      className="inline-flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-full cursor-pointer transition-colors"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                       Escolher arquivo
                     </label>
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">PNG, JPG até 5MB</p>
+                    <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">PNG, JPG até 5MB</p>
                   </div>
                 </div>
               </div>
 
               {/* Nome */}
               <div>
-                <label htmlFor="name" className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label htmlFor="name" className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Nome Completo *
                 </label>
                 <input
@@ -597,7 +597,7 @@ export default function EquipePage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   placeholder="Ex: João Silva"
                   required
                   disabled={isSaving}
@@ -606,23 +606,23 @@ export default function EquipePage() {
 
               {/* Biografia */}
               <div>
-                <label htmlFor="bio" className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label htmlFor="bio" className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Biografia
                 </label>
                 <textarea
                   id="bio"
                   value={formData.bio}
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
                   placeholder="Ex: Barbeiro com 10 anos de experiência..."
-                  rows={3}
+                  rows={2}
                   disabled={isSaving}
                 />
               </div>
 
               {/* Color Picker - Apple Style */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-3">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
                   Cor de Identificação
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -631,9 +631,9 @@ export default function EquipePage() {
                       key={colorOption.value}
                       type="button"
                       onClick={() => setFormData({ ...formData, color: colorOption.value })}
-                      className={`relative h-14 rounded-2xl transition-all ${colorOption.bg} ${
+                      className={`relative h-11 rounded-xl transition-all ${colorOption.bg} ${
                         formData.color === colorOption.value
-                          ? 'ring-4 ring-offset-2 ring-offset-white dark:ring-offset-[#1A1A1A] scale-105 shadow-lg'
+                          ? 'ring-3 ring-offset-2 ring-offset-white dark:ring-offset-[#1A1A1A] scale-105 shadow-lg'
                           : 'hover:scale-105 opacity-80 hover:opacity-100'
                       }`}
                       style={{
@@ -643,7 +643,7 @@ export default function EquipePage() {
                       disabled={isSaving}
                     >
                       {formData.color === colorOption.value && (
-                        <svg className="absolute inset-0 m-auto w-7 h-7 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="absolute inset-0 m-auto w-5 h-5 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -654,10 +654,10 @@ export default function EquipePage() {
 
               {/* Commission Percentage - Apple Control Center Style */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Porcentagem de Comissão
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   {/* Minus Button */}
                   <button
                     type="button"
@@ -665,10 +665,10 @@ export default function EquipePage() {
                       const newValue = Math.max(0, parseFloat(formData.commission_percentage || 0) - 5)
                       setFormData({ ...formData, commission_percentage: newValue })
                     }}
-                    className="w-12 h-12 flex items-center justify-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-95"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-95"
                     disabled={isSaving}
                   >
-                    <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
                     </svg>
                   </button>
@@ -683,12 +683,12 @@ export default function EquipePage() {
                       step="0.01"
                       value={formData.commission_percentage}
                       onChange={(e) => setFormData({ ...formData, commission_percentage: e.target.value })}
-                      className="w-full px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white text-center text-lg font-semibold focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      className="w-full px-3 py-2 pr-10 text-sm bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-center font-semibold focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                       disabled={isSaving}
                     />
                     {/* Percentage Icon */}
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
                     </div>
@@ -701,26 +701,26 @@ export default function EquipePage() {
                       const newValue = Math.min(100, parseFloat(formData.commission_percentage || 0) + 5)
                       setFormData({ ...formData, commission_percentage: newValue })
                     }}
-                    className="w-12 h-12 flex items-center justify-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-95"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-95"
                     disabled={isSaving}
                   >
-                    <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
                     </svg>
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+                <p className="mt-1.5 text-[10px] text-center text-gray-500 dark:text-gray-400">
                   Valor que o profissional recebe sobre cada serviço
                 </p>
               </div>
 
               {/* Action Buttons - Apple Style */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2 pt-2">
                 {/* Cancel Button - Ghost Style */}
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-full transition-all active:scale-95"
+                  className="flex-1 px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-full transition-all active:scale-95"
                   disabled={isSaving}
                 >
                   Cancelar
@@ -729,12 +729,12 @@ export default function EquipePage() {
                 {/* Save Button - Vibrant & Rounded */}
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white font-semibold rounded-full shadow-lg shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 text-sm bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white font-semibold rounded-full shadow-lg shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isSaving}
                 >
                   {isSaving ? (
                     <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
