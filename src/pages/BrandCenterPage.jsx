@@ -571,36 +571,36 @@ export default function ConfiguracoesPage() {
                 <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/30">
                   <Share2 className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate">
                     Link de Agendamento Público
                   </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">
                     Compartilhe este link com seus clientes
                   </p>
                 </div>
               </div>
               
-              <div className="flex gap-3">
-                <div className="flex-1 px-6 py-4 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl">
-                  <p className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+                  <p className="text-xs md:text-sm font-mono text-gray-700 dark:text-gray-300 truncate">
                     {window.location.origin}/booking/...
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={copyBookingLink}
-                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2"
+                  className="px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   {copied ? (
                     <>
-                      <Check className="w-5 h-5" />
-                      Copiado!
+                      <Check className="w-4 md:w-5 h-4 md:h-5" />
+                      <span className="text-sm md:text-base">Copiado!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-5 h-5" />
-                      Copiar Link
+                      <Copy className="w-4 md:w-5 h-4 md:h-5" />
+                      <span className="text-sm md:text-base">Copiar Link</span>
                     </>
                   )}
                 </button>
