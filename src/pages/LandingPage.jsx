@@ -251,7 +251,7 @@ export default function LandingPage() {
                       {/* Screen */}
                       <div className="relative w-full h-full bg-white rounded-[2.5rem] overflow-hidden">
                         <img 
-                          src="/landing page fotos/marcar horarios.png" 
+                          src="/landing page fotos/marcar horario.png" 
                           alt="Agendamento Online"
                           className="w-full h-full object-cover object-top"
                         />
@@ -285,7 +285,7 @@ export default function LandingPage() {
                   </div>
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/5">
                     <img 
-                      src="/landing page fotos/painel dashboard.png" 
+                      src="/landing page fotos/dashboard.png" 
                       alt="Dashboard"
                       className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
                     />
@@ -308,7 +308,7 @@ export default function LandingPage() {
                   </div>
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/5">
                     <img 
-                      src="/landing page fotos/painel agenda.png" 
+                      src="/landing page fotos/agenda.png" 
                       alt="Agenda"
                       className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
                     />
@@ -331,7 +331,7 @@ export default function LandingPage() {
                   </div>
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/5">
                     <img 
-                      src="/landing page fotos/painel financeiro.png" 
+                      src="/landing page fotos/financeiro.png" 
                       alt="Financeiro"
                       className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
                     />
@@ -354,7 +354,7 @@ export default function LandingPage() {
                   </div>
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/5">
                     <img 
-                      src="/landing page fotos/cmr de clientes.png" 
+                      src="/landing page fotos/crm clientes.png" 
                       alt="CRM"
                       className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
                     />
@@ -400,7 +400,7 @@ export default function LandingPage() {
                   </div>
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/5">
                     <img 
-                      src="/landing page fotos/serviçoes e preços.png" 
+                      src="/landing page fotos/serviços.png" 
                       alt="Serviços"
                       className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
                     />
