@@ -389,7 +389,12 @@ export default function FinanceiroPage() {
 
       const totalIncome = appointmentsIncome + manualIncome
       const profit = totalIncome - expenses
-      const avgTicket = appointmentsData.length > 0 ? totalIncome / appointmentsData.length : 0
+      
+      // Fix: Calculate average ticket only from appointments (not manual income)
+      const nonSubscriberAppointments = (appointmentsData || []).filter(apt => !apt.is_subscriber)
+      const avgTicket = nonSubscriberAppointments.length > 0 
+        ? appointmentsIncome / nonSubscriberAppointments.length 
+        : 0
 
       // 3. Prepare chart data (daily revenue)
       const dailyData = {}
@@ -429,8 +434,11 @@ export default function FinanceiroPage() {
       setExpensesByCategory(expensesArray)
       setTransactions(transactionsData || [])
       
-      // Calculate cash balance (cash income - cash expenses)
-      const cashIncome = (transactionsData || [])
+      // Calculate cash balance (appointments + manual cash income - cash expenses)
+      // Assumindo que agendamentos são pagos em dinheiro (você pode adicionar campo payment_method depois)
+      const appointmentsCash = appointmentsIncome // Por enquanto, todos agendamentos contam como dinheiro
+      
+      const manualCashIncome = (transactionsData || [])
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0)
       
@@ -438,7 +446,7 @@ export default function FinanceiroPage() {
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0)
       
-      setCashBalance(cashIncome - cashExpenses)
+      setCashBalance(appointmentsCash + manualCashIncome - cashExpenses)
       
       setIsLoading(false)
     } catch (err) {
