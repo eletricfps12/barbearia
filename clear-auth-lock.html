@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpar Auth Lock - Brio App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #22c55e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: #0a0a0a;
+            padding: 40px;
+            border-radius: 10px;
+            border: 1px solid #22c55e33;
+        }
+        button {
+            background: #22c55e;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px;
+        }
+        button:hover {
+            background: #16a34a;
+        }
+        .success {
+            color: #22c55e;
+            margin-top: 20px;
+        }
+        .error {
+            color: #ef4444;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Limpar Auth Lock</h1>
+        <p>Use este utilitário para limpar locks de autenticação travados</p>
+        
+        <button onclick="clearAll()">Limpar Tudo</button>
+        <button onclick="clearAuthOnly()">Limpar Apenas Auth</button>
+        
+        <div id="result"></div>
+        
+        <hr style="margin: 30px 0; border-color: #22c55e33;">
+        
+        <h3>Instruções:</h3>
+        <ol style="text-align: left; max-width: 500px; margin: 0 auto;">
+            <li>Clique em "Limpar Tudo" para remover todos os dados do localStorage</li>
+            <li>Feche TODAS as abas do localhost:5173</li>
+            <li>Abra uma nova aba e acesse http://localhost:5173/login</li>
+            <li>Faça login normalmente</li>
+        </ol>
+    </div>
+
+    <script>
+        function clearAll() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                document.getElementById('result').innerHTML = '<p class="success">✅ Todos os dados foram limpos! Feche esta aba e abra uma nova.</p>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<p class="error">❌ Erro: ' + error.message + '</p>';
+            }
+        }
+
+        function clearAuthOnly() {
+            try {
+                const keys = Object.keys(localStorage);
+                let cleared = 0;
+                
+                keys.forEach(key => {
+                    if (key.includes('supabase') || key.includes('auth') || key.includes('sb-')) {
+                        localStorage.removeItem(key);
+                        cleared++;
+                    }
+                });
+                
+                document.getElementById('result').innerHTML = '<p class="success">✅ ' + cleared + ' chaves de autenticação foram limpas! Feche esta aba e abra uma nova.</p>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<p class="error">❌ Erro: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

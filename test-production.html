@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Produção - Brio App</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #22c55e;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #0a0a0a;
+            border: 1px solid #22c55e33;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+        button {
+            background: #22c55e;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        button:hover {
+            background: #16a34a;
+        }
+        pre {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico Brio App - Produção</h1>
+    
+    <div class="test-section">
+        <h2>1. Teste de Rotas SPA</h2>
+        <p>Clique nos links abaixo para testar se as rotas funcionam:</p>
+        <button onclick="testRoute('/login')">Testar /login</button>
+        <button onclick="testRoute('/owner/login')">Testar /owner/login</button>
+        <button onclick="testRoute('/brio-super-admin')">Testar /brio-super-admin</button>
+        <button onclick="testRoute('/admin')">Testar /admin</button>
+        <div id="route-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Variáveis de Ambiente</h2>
+        <button onclick="checkEnvVars()">Verificar Variáveis</button>
+        <pre id="env-result">Clique no botão para verificar</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Teste de Conexão Supabase</h2>
+        <button onclick="testSupabase()">Testar Conexão</button>
+        <pre id="supabase-result">Clique no botão para testar</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Informações do Sistema</h2>
+        <pre id="system-info"></pre>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+        // Configuração (substitua com suas variáveis)
+        const SUPABASE_URL = 'https://cntdiuaxocutqemqnthd.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNudGRpdWF4b2N1dHFlbXFudGhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1NzU5NzcsImV4cCI6MjA1MTE1MTk3N30.Ql8vZqYvQxQxQxQxQxQxQxQxQxQxQxQxQxQxQxQ'
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+        window.testRoute = function(route) {
+            const result = document.getElementById('route-result')
+            result.innerHTML = `<p class="warning">Navegando para ${route}...</p>`
+            setTimeout(() => {
+                window.location.href = route
+            }, 500)
+        }
+
+        window.checkEnvVars = function() {
+            const result = document.getElementById('env-result')
+            const info = {
+                'SUPABASE_URL': SUPABASE_URL,
+                'SUPABASE_ANON_KEY': SUPABASE_ANON_KEY ? '✅ Configurada' : '❌ Não configurada',
+                'Current URL': window.location.href,
+                'Origin': window.location.origin,
+                'Protocol': window.location.protocol
+            }
+            result.textContent = JSON.stringify(info, null, 2)
+        }
+
+        window.testSupabase = async function() {
+            const result = document.getElementById('supabase-result')
+            result.textContent = 'Testando conexão...'
+            
+            try {
+                // Teste 1: Verificar sessão
+                const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+                
+                if (sessionError) {
+                    result.innerHTML = `<span class="error">❌ Erro ao verificar sessão:</span>\n${JSON.stringify(sessionError, null, 2)}`
+                    return
+                }
+
+                // Teste 2: Tentar buscar profiles (sem autenticação)
+                const { data: profiles, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .limit(1)
+
+                const tests = {
+                    'Conexão Supabase': '✅ OK',
+                    'Sessão Atual': sessionData.session ? `✅ Logado como ${sessionData.session.user.email}` : '⚠️ Não logado',
+                    'Acesso ao Banco': profileError ? `❌ ${profileError.message}` : '✅ OK',
+                    'URL Supabase': SUPABASE_URL
+                }
+
+                result.textContent = JSON.stringify(tests, null, 2)
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Erro crítico:</span>\n${error.message}`
+            }
+        }
+
+        // Informações do sistema ao carregar
+        document.getElementById('system-info').textContent = JSON.stringify({
+            'User Agent': navigator.userAgent,
+            'URL Atual': window.location.href,
+            'Domínio': window.location.hostname,
+            'Protocolo': window.location.protocol,
+            'Porta': window.location.port || 'padrão',
+            'Caminho': window.location.pathname,
+            'LocalStorage disponível': typeof(Storage) !== 'undefined' ? '✅ Sim' : '❌ Não'
+        }, null, 2)
+
+        // Auto-check ao carregar
+        checkEnvVars()
+    </script>
+</body>
+</html>
