@@ -263,6 +263,33 @@ export default function BarbershopPublicPage() {
   }
 
   /**
+   * Format phone number as user types
+   */
+  const formatPhoneNumber = (value) => {
+    // Remove all non-numeric characters
+    const numbers = value.replace(/\D/g, '')
+    
+    // Apply mask: (XX) XXXXX-XXXX
+    if (numbers.length <= 2) {
+      return numbers
+    } else if (numbers.length <= 7) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
+    } else if (numbers.length <= 11) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`
+    } else {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`
+    }
+  }
+
+  /**
+   * Handle phone input change with formatting
+   */
+  const handlePhoneChange = (e) => {
+    const formatted = formatPhoneNumber(e.target.value)
+    setClientPhone(formatted)
+  }
+
+  /**
    * Handle booking submission
    */
   const handleSubmit = async () => {
@@ -273,8 +300,22 @@ export default function BarbershopPublicPage() {
       return
     }
 
-    if (clientPhone.trim().length < 10) {
-      setError('Digite um telefone válido')
+    // Remove formatting and validate phone
+    const phoneNumbers = clientPhone.replace(/\D/g, '')
+    if (phoneNumbers.length !== 11) {
+      setError('Digite um telefone válido com DDD (11 dígitos)')
+      return
+    }
+
+    // Validate email
+    if (!clientEmail.trim()) {
+      setError('Digite seu e-mail')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(clientEmail.trim())) {
+      setError('Digite um e-mail válido')
       return
     }
 
@@ -314,8 +355,8 @@ export default function BarbershopPublicPage() {
           barber_id: selectedBarber.id,
           service_id: selectedService.id,
           client_name: clientName.trim(),
-          client_phone: clientPhone.trim(),
-          client_email: clientEmail.trim() || null,
+          client_phone: phoneNumbers, // Save only numbers
+          client_email: clientEmail.trim(),
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: 'confirmed'
@@ -347,13 +388,18 @@ export default function BarbershopPublicPage() {
    * Check if form can be submitted
    */
   const canSubmit = () => {
+    const phoneNumbers = clientPhone.replace(/\D/g, '')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    
     return (
       selectedBarber &&
       selectedService &&
       selectedDate &&
       selectedSlot &&
       clientName.trim().length >= 3 &&
-      clientPhone.trim().length >= 10
+      phoneNumbers.length === 11 &&
+      clientEmail.trim().length > 0 &&
+      emailRegex.test(clientEmail.trim())
     )
   }
 
@@ -824,6 +870,7 @@ export default function BarbershopPublicPage() {
                   placeholder="Digite seu nome"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
                   disabled={isSubmitting}
+                  required
                 />
               </div>
               <div>
@@ -834,15 +881,17 @@ export default function BarbershopPublicPage() {
                   id="phone"
                   type="tel"
                   value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
+                  onChange={handlePhoneChange}
                   placeholder="(11) 99999-9999"
+                  maxLength={15}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
                   disabled={isSubmitting}
+                  required
                 />
               </div>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  E-mail <span className="text-gray-400 text-xs">(opcional)</span>
+                  E-mail *
                 </label>
                 <input
                   id="email"
@@ -852,6 +901,7 @@ export default function BarbershopPublicPage() {
                   placeholder="seu@email.com"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
                   disabled={isSubmitting}
+                  required
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   📧 Receba confirmação por e-mail
