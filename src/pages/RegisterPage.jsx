@@ -102,6 +102,17 @@ export default function RegisterPage() {
     try {
       setLoading(true)
 
+      // 0. Verificar se o email já existe e se é um usuário órfão
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', formData.ownerEmail)
+        .maybeSingle()
+
+      if (existingUser) {
+        throw new Error('Este email já está cadastrado. Tente fazer login ou use outro email.')
+      }
+
       // 1. Criar usuário no Auth (sem enviar email de confirmação)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.ownerEmail,
@@ -114,66 +125,89 @@ export default function RegisterPage() {
         }
       })
 
-      if (authError) throw authError
+      if (authError) {
+        // Se o erro for "User already registered", significa que é um usuário órfão
+        if (authError.message.includes('already registered')) {
+          throw new Error('Este email já foi usado anteriormente. Por favor, entre em contato com o suporte para liberar o cadastro.')
+        }
+        throw authError
+      }
 
       if (!authData.user) {
         throw new Error('Usuário não foi criado')
       }
 
-      // 2. Criar perfil como OWNER com email e telefone
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          full_name: formData.ownerName,
-          email: formData.ownerEmail,
-          phone: formData.phone || null,
-          role: 'owner'
-        })
+      const userId = authData.user.id
 
-      if (profileError) throw profileError
+      try {
+        // 2. Criar perfil como OWNER com email e telefone
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: formData.ownerName,
+            email: formData.ownerEmail,
+            phone: formData.phone || null,
+            role: 'owner'
+          })
 
-      // 3. Criar barbearia com status PENDING
-      const slug = formData.barbershopName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
+        if (profileError) throw profileError
 
-      const { data: barbershopData, error: barbershopError } = await supabase
-        .from('barbershops')
-        .insert({
-          name: formData.barbershopName,
-          slug: slug,
-          owner_id: authData.user.id,
-          contact_phone: formData.phone || null,
-          subscription_plan: null,
-          subscription_status: 'pending',
-          trial_ends_at: null,
-          next_payment_at: null
-        })
-        .select()
-        .single()
+        // 3. Criar barbearia com status PENDING
+        const slug = formData.barbershopName
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '')
 
-      if (barbershopError) throw barbershopError
+        const { data: barbershopData, error: barbershopError } = await supabase
+          .from('barbershops')
+          .insert({
+            name: formData.barbershopName,
+            slug: slug,
+            owner_id: userId,
+            contact_phone: formData.phone || null,
+            subscription_plan: null,
+            subscription_status: 'pending',
+            trial_ends_at: null,
+            next_payment_at: null
+          })
+          .select()
+          .single()
 
-      // 4. Criar registro na tabela barbers para vincular owner à barbearia
-      const { error: barberError } = await supabase
-        .from('barbers')
-        .insert({
-          profile_id: authData.user.id,
-          barbershop_id: barbershopData.id,
-          name: formData.ownerName
-        })
+        if (barbershopError) throw barbershopError
 
-      if (barberError) throw barberError
+        // 4. Criar registro na tabela barbers para vincular owner à barbearia
+        const { error: barberError } = await supabase
+          .from('barbers')
+          .insert({
+            profile_id: userId,
+            barbershop_id: barbershopData.id,
+            name: formData.ownerName
+          })
 
-      // 5. Fazer logout imediatamente (não deixar logado)
-      await supabase.auth.signOut()
+        if (barberError) throw barberError
 
-      // 6. Mostrar tela de sucesso
-      setSuccess(true)
+        // 5. Fazer logout imediatamente (não deixar logado)
+        await supabase.auth.signOut()
+
+        // 6. Mostrar tela de sucesso
+        setSuccess(true)
+
+      } catch (innerError) {
+        // Se algo falhou após criar o usuário no auth, tentar fazer rollback
+        console.error('Error in registration process, attempting rollback:', innerError)
+        
+        // Tentar deletar o usuário do auth (rollback)
+        try {
+          await supabase.auth.admin.deleteUser(userId)
+        } catch (rollbackError) {
+          console.error('Failed to rollback user creation:', rollbackError)
+        }
+        
+        throw innerError
+      }
 
     } catch (error) {
       console.error('Error creating account:', error)
