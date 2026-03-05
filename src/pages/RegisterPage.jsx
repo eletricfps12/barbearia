@@ -102,14 +102,14 @@ export default function RegisterPage() {
     try {
       setLoading(true)
 
-      // 0. Verificar se o email já existe e se é um usuário órfão
-      const { data: existingUser } = await supabase
+      // 0. Verificar se o email já existe na tabela profiles
+      const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', formData.ownerEmail)
         .maybeSingle()
 
-      if (existingUser) {
+      if (existingProfile) {
         throw new Error('Este email já está cadastrado. Tente fazer login ou use outro email.')
       }
 
@@ -126,9 +126,17 @@ export default function RegisterPage() {
       })
 
       if (authError) {
-        // Se o erro for "User already registered", significa que é um usuário órfão
-        if (authError.message.includes('already registered')) {
-          throw new Error('Este email já foi usado anteriormente. Por favor, entre em contato com o suporte para liberar o cadastro.')
+        // Se o erro for "User already registered", é um usuário órfão
+        if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
+          setError(
+            'Este email já foi usado anteriormente mas o cadastro não foi concluído. ' +
+            'Para resolver, você tem 2 opções:\n\n' +
+            '1. Use outro email para cadastrar\n' +
+            '2. Entre em contato com o suporte para liberar este email\n\n' +
+            'Email de suporte: suporte@brioapp.online'
+          )
+          setLoading(false)
+          return
         }
         throw authError
       }
