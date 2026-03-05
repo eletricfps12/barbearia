@@ -254,7 +254,7 @@ export default function Login() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => showToast.info('Funcionalidade de recuperação de senha será implementada em breve.', 'Em Breve')}
+                onClick={() => navigate('/forgot-password')}
                 className="text-sm text-green-400 hover:text-green-300 transition-colors"
                 disabled={isLoading}
               >

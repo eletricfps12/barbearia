@@ -8,6 +8,8 @@ import LandingPage from './pages/LandingPage'
 import BookingPage from './pages/BookingPage'
 import DashboardHome from './pages/DashboardHome'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import AdminLayout from './components/AdminLayout'
 import ServicosPage from './pages/ServicosPage'
 import BrandCenterPage from './pages/BrandCenterPage'
@@ -118,6 +120,18 @@ function App() {
         <Route 
           path="/login" 
           element={<Login />} 
+        />
+        
+        {/* Rota de recuperação de senha */}
+        <Route 
+          path="/forgot-password" 
+          element={<ForgotPassword />} 
+        />
+        
+        {/* Rota de redefinição de senha */}
+        <Route 
+          path="/reset-password" 
+          element={<ResetPassword />} 
         />
         
         {/* Rota de registro - cadastro de novas barbearias */}
