@@ -242,14 +242,14 @@ export default function LandingPage() {
                   </div>
 
                   {/* Screenshot - Mockup Style */}
-                  <div className="relative flex justify-center lg:justify-end px-4 lg:px-0">
+                  <div className="relative flex justify-center lg:justify-end">
                     {/* Phone Frame */}
-                    <div className="relative w-[280px] sm:w-[320px] h-[570px] sm:h-[650px] bg-zinc-950 rounded-[3rem] p-3 shadow-2xl border-8 border-zinc-800 transform hover:scale-105 transition-transform duration-500">
+                    <div className="relative w-[240px] sm:w-[280px] md:w-[300px] h-[490px] sm:h-[570px] md:h-[610px] bg-zinc-950 rounded-[2.5rem] sm:rounded-[3rem] p-2 sm:p-3 shadow-2xl border-4 sm:border-8 border-zinc-800 transform hover:scale-105 transition-transform duration-500">
                       {/* Notch */}
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-950 rounded-b-3xl z-10" />
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 sm:w-32 h-5 sm:h-7 bg-zinc-950 rounded-b-2xl sm:rounded-b-3xl z-10" />
                       
                       {/* Screen */}
-                      <div className="relative w-full h-full bg-white rounded-[2.5rem] overflow-hidden">
+                      <div className="relative w-full h-full bg-white rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden">
                         <img 
                           src="/landing page fotos/marcar horario.png" 
                           alt="Agendamento Online"
@@ -259,8 +259,8 @@ export default function LandingPage() {
                     </div>
 
                     {/* Floating Elements */}
-                    <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-500/20 rounded-full blur-2xl animate-pulse" />
-                    <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl animate-pulse delay-1000" />
+                    <div className="absolute -top-6 -right-6 w-20 sm:w-24 h-20 sm:h-24 bg-green-500/20 rounded-full blur-2xl animate-pulse" />
+                    <div className="absolute -bottom-6 -left-6 w-24 sm:w-32 h-24 sm:h-32 bg-emerald-500/20 rounded-full blur-2xl animate-pulse delay-1000" />
                   </div>
 
                 </div>
