@@ -59,6 +59,18 @@ export default function FinanceiroPage() {
     manualTransactions: [],
     subscriptions: []
   })
+  const [isCashDetailOpen, setIsCashDetailOpen] = useState(false)
+  const [cashDetails, setCashDetails] = useState({
+    cashIncome: [],
+    cashExpenses: []
+  })
+  const [isProfitDetailOpen, setIsProfitDetailOpen] = useState(false)
+  const [profitDetails, setProfitDetails] = useState({
+    totalIncome: 0,
+    totalExpenses: 0,
+    incomeItems: [],
+    expenseItems: []
+  })
   
   // Form states
   const [formData, setFormData] = useState({
@@ -68,7 +80,8 @@ export default function FinanceiroPage() {
     date: new Date().toISOString().split('T')[0],
     barber_id: '',
     is_recurring: false,
-    recurrence_day: ''
+    recurrence_day: '',
+    payment_method: 'cash' // Novo campo: cash, card, pix, other
   })
 
   // Cash reconciliation form
@@ -396,16 +409,36 @@ export default function FinanceiroPage() {
         ? appointmentsIncome / nonSubscriberAppointments.length 
         : 0
 
-      // 3. Prepare chart data (daily revenue)
+      // 3. Prepare chart data (daily profit = revenue - expenses)
       const dailyData = {}
+      
+      // Add appointments revenue by date
       appointmentsData.forEach(apt => {
         const date = new Date(apt.start_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-        dailyData[date] = (dailyData[date] || 0) + (apt.services?.price || 0)
+        if (!dailyData[date]) {
+          dailyData[date] = { receita: 0, despesas: 0 }
+        }
+        dailyData[date].receita += (apt.services?.price || 0)
+      })
+      
+      // Add manual transactions (income and expenses) by date
+      transactionsData.forEach(t => {
+        const date = new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+        if (!dailyData[date]) {
+          dailyData[date] = { receita: 0, despesas: 0 }
+        }
+        if (t.type === 'income') {
+          dailyData[date].receita += parseFloat(t.amount)
+        } else {
+          dailyData[date].despesas += parseFloat(t.amount)
+        }
       })
 
-      const chartDataArray = Object.entries(dailyData).map(([date, value]) => ({
+      const chartDataArray = Object.entries(dailyData).map(([date, values]) => ({
         date,
-        receita: value
+        receita: values.receita,
+        despesas: values.despesas,
+        lucro: values.receita - values.despesas
       })).slice(0, 15)
 
       // 4. Prepare expense categories for pie chart
@@ -434,19 +467,18 @@ export default function FinanceiroPage() {
       setExpensesByCategory(expensesArray)
       setTransactions(transactionsData || [])
       
-      // Calculate cash balance (appointments + manual cash income - cash expenses)
-      // Assumindo que agendamentos são pagos em dinheiro (você pode adicionar campo payment_method depois)
-      const appointmentsCash = appointmentsIncome // Por enquanto, todos agendamentos contam como dinheiro
-      
+      // Calculate cash balance - ONLY manual cash transactions (payment_method = 'cash')
+      // Appointments are NOT included because they don't have payment_method yet
       const manualCashIncome = (transactionsData || [])
-        .filter(t => t.type === 'income')
+        .filter(t => t.type === 'income' && t.payment_method === 'cash')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0)
       
       const cashExpenses = (transactionsData || [])
-        .filter(t => t.type === 'expense')
+        .filter(t => t.type === 'expense' && t.payment_method === 'cash')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0)
       
-      setCashBalance(appointmentsCash + manualCashIncome - cashExpenses)
+      // Cash balance = manual cash income - cash expenses
+      setCashBalance(manualCashIncome - cashExpenses)
       
       setIsLoading(false)
     } catch (err) {
@@ -498,8 +530,8 @@ export default function FinanceiroPage() {
   }
 
   const openCashReconciliation = () => {
-    // Calculate expected cash from transactions
-    const expectedCash = cashBalance
+    // Calculate expected cash from transactions (only cash transactions)
+    const expectedCash = cashBalance // Already calculated with cash-only filter
     setCashForm({
       expected_cash: expectedCash,
       actual_cash: '',
@@ -570,7 +602,8 @@ export default function FinanceiroPage() {
       date: new Date().toISOString().split('T')[0],
       barber_id: '',
       is_recurring: false,
-      recurrence_day: ''
+      recurrence_day: '',
+      payment_method: 'cash'
     })
     setIsModalOpen(true)
   }
@@ -584,7 +617,8 @@ export default function FinanceiroPage() {
       date: new Date().toISOString().split('T')[0],
       barber_id: '',
       is_recurring: false,
-      recurrence_day: ''
+      recurrence_day: '',
+      payment_method: 'cash'
     })
   }
 
@@ -609,7 +643,8 @@ export default function FinanceiroPage() {
         date: formData.date,
         barber_id: formData.barber_id || null,
         is_recurring: formData.is_recurring,
-        recurrence_day: formData.is_recurring && formData.recurrence_day ? parseInt(formData.recurrence_day) : null
+        recurrence_day: formData.is_recurring && formData.recurrence_day ? parseInt(formData.recurrence_day) : null,
+        payment_method: formData.payment_method
       }
 
       const { error } = await supabase
@@ -706,6 +741,126 @@ export default function FinanceiroPage() {
     } catch (err) {
       console.error('Error fetching revenue details:', err)
       showToast.error('Erro ao carregar detalhes')
+    }
+  }
+
+  const fetchCashDetails = async () => {
+    try {
+      const { startDate, endDate } = getDateRange()
+
+      // Buscar apenas transações em DINHEIRO do período selecionado
+      let transactionsQuery = supabase
+        .from('financial_transactions')
+        .select('*, barbers(name)')
+        .eq('barbershop_id', barbershopId)
+        .eq('payment_method', 'cash')
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+
+      if (selectedBarber !== 'all') {
+        transactionsQuery = transactionsQuery.eq('barber_id', selectedBarber)
+      }
+
+      const { data: transactionsData, error: transactionsError } = await transactionsQuery
+      if (transactionsError) throw transactionsError
+
+      const cashIncome = (transactionsData || []).filter(t => t.type === 'income')
+      const cashExpenses = (transactionsData || []).filter(t => t.type === 'expense')
+
+      setCashDetails({
+        cashIncome,
+        cashExpenses
+      })
+
+      setIsCashDetailOpen(true)
+    } catch (err) {
+      console.error('Error fetching cash details:', err)
+      showToast.error('Erro ao carregar detalhes do dinheiro')
+    }
+  }
+
+  const fetchProfitDetails = async () => {
+    try {
+      const { startDate, endDate } = getDateRange()
+
+      // 1. Buscar agendamentos completos
+      let appointmentsQuery = supabase
+        .from('appointments')
+        .select('*, services(name, price), barbers(name), is_subscriber')
+        .eq('barbershop_id', barbershopId)
+        .eq('status', 'completed')
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
+        .order('start_time', { ascending: false })
+
+      if (selectedBarber !== 'all') {
+        appointmentsQuery = appointmentsQuery.eq('barber_id', selectedBarber)
+      }
+
+      let { data: appointmentsData, error: appointmentsError } = await appointmentsQuery
+      
+      if (appointmentsError && appointmentsError.message?.includes('is_subscriber')) {
+        appointmentsQuery = supabase
+          .from('appointments')
+          .select('*, services(name, price), barbers(name)')
+          .eq('barbershop_id', barbershopId)
+          .eq('status', 'completed')
+          .gte('start_time', startDate.toISOString())
+          .lte('start_time', endDate.toISOString())
+          .order('start_time', { ascending: false })
+
+        if (selectedBarber !== 'all') {
+          appointmentsQuery = appointmentsQuery.eq('barber_id', selectedBarber)
+        }
+
+        const result = await appointmentsQuery
+        appointmentsData = result.data
+        appointmentsError = result.error
+      }
+
+      if (appointmentsError) throw appointmentsError
+
+      // 2. Buscar todas as transações manuais
+      let transactionsQuery = supabase
+        .from('financial_transactions')
+        .select('*, barbers(name)')
+        .eq('barbershop_id', barbershopId)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+
+      if (selectedBarber !== 'all') {
+        transactionsQuery = transactionsQuery.eq('barber_id', selectedBarber)
+      }
+
+      const { data: transactionsData, error: transactionsError } = await transactionsQuery
+      if (transactionsError) throw transactionsError
+
+      const incomeTransactions = (transactionsData || []).filter(t => t.type === 'income')
+      const expenseTransactions = (transactionsData || []).filter(t => t.type === 'expense')
+
+      const appointmentsIncome = (appointmentsData || [])
+        .filter(apt => !apt.is_subscriber)
+        .reduce((sum, apt) => sum + (apt.services?.price || 0), 0)
+
+      const manualIncome = incomeTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+      const totalExpenses = expenseTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+
+      setProfitDetails({
+        totalIncome: appointmentsIncome + manualIncome,
+        totalExpenses,
+        incomeItems: [
+          ...appointmentsData.filter(apt => !apt.is_subscriber),
+          ...incomeTransactions
+        ],
+        expenseItems: expenseTransactions
+      })
+
+      setIsProfitDetailOpen(true)
+    } catch (err) {
+      console.error('Error fetching profit details:', err)
+      showToast.error('Erro ao carregar detalhes do lucro')
     }
   }
 
@@ -863,10 +1018,19 @@ export default function FinanceiroPage() {
         <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo em Espécie</span>
-            <div className="p-2 bg-emerald-100 dark:bg-emerald-500/10 rounded-lg">
-              <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchCashDetails}
+                className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-colors"
+                title="Ver detalhamento"
+              >
+                <List className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </button>
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-500/10 rounded-lg">
+                <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+              </div>
             </div>
           </div>
           <div className="flex items-end justify-between">
@@ -903,16 +1067,33 @@ export default function FinanceiroPage() {
         <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Lucro Líquido</span>
-            <div className={`p-2 rounded-lg ${
-              summary.profit >= 0 
-                ? 'bg-green-100 dark:bg-green-500/10' 
-                : 'bg-red-100 dark:bg-red-500/10'
-            }`}>
-              <TrendingUp className={`w-4 h-4 ${
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchProfitDetails}
+                className={`p-2 rounded-lg transition-colors ${
+                  summary.profit >= 0
+                    ? 'hover:bg-green-50 dark:hover:bg-green-500/10'
+                    : 'hover:bg-red-50 dark:hover:bg-red-500/10'
+                }`}
+                title="Ver detalhamento"
+              >
+                <List className={`w-4 h-4 ${
+                  summary.profit >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`} />
+              </button>
+              <div className={`p-2 rounded-lg ${
                 summary.profit >= 0 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : 'text-red-600 dark:text-red-400'
-              }`} />
+                  ? 'bg-green-100 dark:bg-green-500/10' 
+                  : 'bg-red-100 dark:bg-red-500/10'
+              }`}>
+                <TrendingUp className={`w-4 h-4 ${
+                  summary.profit >= 0 
+                    ? 'text-green-600 dark:text-green-400' 
+                    : 'text-red-600 dark:text-red-400'
+                }`} />
+              </div>
             </div>
           </div>
           <div className="flex items-end justify-between">
@@ -965,22 +1146,24 @@ export default function FinanceiroPage() {
 
       {/* Charts Row - Minimalista e Moderno */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Line Chart - Revenue Evolution (Moderno e Tecnológico) */}
+        {/* Line Chart - Daily Profit Evolution (Moderno e Tecnológico) */}
         <div className="lg:col-span-2 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evolução de Receita</h3>
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-              <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"></div>
-              <span>Receita</span>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evolução de Lucro Diário</h3>
+            <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span>Lucro</span>
+              </div>
             </div>
           </div>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  <linearGradient id="colorLucro" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid 
@@ -1004,37 +1187,42 @@ export default function FinanceiroPage() {
                   tickFormatter={(value) => `R$ ${value}`}
                 />
                 <Tooltip 
-                  cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '5 5' }}
+                  cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '5 5' }}
                   contentStyle={{
                     backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
                     borderRadius: '12px',
                     padding: '12px 16px',
                     boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
                     backdropFilter: 'blur(10px)'
                   }}
                   labelStyle={{ color: '#e5e7eb', fontWeight: '600', marginBottom: '8px', fontSize: '13px' }}
-                  itemStyle={{ color: '#60a5fa', fontSize: '14px', fontWeight: '500' }}
-                  formatter={(value) => [`${formatCurrency(value)}`, 'Receita']}
+                  itemStyle={{ fontSize: '13px', fontWeight: '500' }}
+                  formatter={(value, name) => {
+                    if (name === 'receita') return [`${formatCurrency(value)}`, 'Receita']
+                    if (name === 'despesas') return [`${formatCurrency(value)}`, 'Despesas']
+                    if (name === 'lucro') return [`${formatCurrency(value)}`, 'Lucro']
+                    return [formatCurrency(value), name]
+                  }}
                 />
                 <Area 
                   type="monotone"
-                  dataKey="receita" 
-                  stroke="#3b82f6"
+                  dataKey="lucro" 
+                  stroke="#10b981"
                   strokeWidth={3}
-                  fill="url(#colorReceita)"
+                  fill="url(#colorLucro)"
                   animationDuration={1500}
                   animationEasing="ease-in-out"
                   dot={{ 
-                    fill: '#3b82f6', 
+                    fill: '#10b981', 
                     strokeWidth: 2, 
-                    stroke: '#1e40af',
+                    stroke: '#059669',
                     r: 4
                   }}
                   activeDot={{ 
                     r: 6, 
-                    fill: '#60a5fa',
-                    stroke: '#1e40af',
+                    fill: '#34d399',
+                    stroke: '#059669',
                     strokeWidth: 2
                   }}
                 />
@@ -1633,6 +1821,25 @@ export default function FinanceiroPage() {
                 />
               </div>
 
+              {/* Método de Pagamento */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                  Método de Pagamento *
+                </label>
+                <select
+                  value={formData.payment_method}
+                  onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
+                  required
+                  disabled={isSaving}
+                >
+                  <option value="cash">💵 Dinheiro</option>
+                  <option value="card">💳 Cartão</option>
+                  <option value="pix">📱 Pix</option>
+                  <option value="other">🔄 Outro</option>
+                </select>
+              </div>
+
               {/* Profissional */}
               <div>
                 <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
@@ -1789,15 +1996,34 @@ export default function FinanceiroPage() {
             </div>
 
             <form onSubmit={handleCashReconciliation} className="px-6 pb-6 space-y-5">
-              <div className="p-4 bg-blue-50 dark:bg-blue-500/10 rounded-2xl border border-blue-200 dark:border-blue-500/20">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-1">
-                  Valor Esperado em Caixa
+              <div className={`p-4 rounded-2xl border ${
+                cashForm.expected_cash < 0 
+                  ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
+                  : 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20'
+              }`}>
+                <p className={`text-sm font-semibold mb-1 ${
+                  cashForm.expected_cash < 0
+                    ? 'text-red-900 dark:text-red-300'
+                    : 'text-blue-900 dark:text-blue-300'
+                }`}>
+                  {cashForm.expected_cash < 0 ? 'Déficit Esperado' : 'Valor Esperado em Caixa'}
                 </p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <p className={`text-2xl font-bold ${
+                  cashForm.expected_cash < 0
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-blue-600 dark:text-blue-400'
+                }`}>
                   {formatCurrency(cashForm.expected_cash)}
                 </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Baseado nas transações manuais do período
+                <p className={`text-xs mt-1 ${
+                  cashForm.expected_cash < 0
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-blue-600 dark:text-blue-400'
+                }`}>
+                  {cashForm.expected_cash < 0 
+                    ? 'Você tem mais despesas que receitas em dinheiro'
+                    : 'Baseado nas transações manuais do período'
+                  }
                 </p>
               </div>
 
@@ -1834,8 +2060,8 @@ export default function FinanceiroPage() {
                     {parseFloat(cashForm.actual_cash) === parseFloat(cashForm.expected_cash)
                       ? '✓ Caixa Conferido'
                       : parseFloat(cashForm.actual_cash) > parseFloat(cashForm.expected_cash)
-                      ? 'Sobra de Caixa'
-                      : 'Falta de Caixa'}
+                      ? cashForm.expected_cash < 0 ? 'Diferença Positiva' : 'Sobra de Caixa'
+                      : cashForm.expected_cash < 0 ? 'Diferença Negativa' : 'Falta de Caixa'}
                   </p>
                   <p className={`text-2xl font-bold ${
                     parseFloat(cashForm.actual_cash) === parseFloat(cashForm.expected_cash)
@@ -1846,6 +2072,13 @@ export default function FinanceiroPage() {
                   }`}>
                     {formatCurrency(Math.abs(parseFloat(cashForm.actual_cash) - parseFloat(cashForm.expected_cash)))}
                   </p>
+                  {cashForm.expected_cash < 0 && (
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                      Real: {formatCurrency(parseFloat(cashForm.actual_cash))} | 
+                      Esperado: {formatCurrency(parseFloat(cashForm.expected_cash))} | 
+                      Diferença: {formatCurrency(parseFloat(cashForm.actual_cash) - parseFloat(cashForm.expected_cash))}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -2132,6 +2365,360 @@ export default function FinanceiroPage() {
                 </div>
                 <button
                   onClick={() => setIsRevenueDetailOpen(false)}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cash Detail Modal */}
+      {isCashDetailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="relative bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-4xl border border-gray-200 dark:border-[#2A2A2A] shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalhamento do Saldo em Espécie</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{getPeriodLabel()} • Apenas Dinheiro</p>
+              </div>
+              <button 
+                onClick={() => setIsCashDetailOpen(false)} 
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Entradas em Dinheiro</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">
+                    {formatCurrency(
+                      cashDetails.cashIncome.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+                    )}
+                  </p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {cashDetails.cashIncome.length} transações
+                  </p>
+                </div>
+
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Saídas em Dinheiro</p>
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">
+                    {formatCurrency(
+                      cashDetails.cashExpenses.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+                    )}
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    {cashDetails.cashExpenses.length} transações
+                  </p>
+                </div>
+              </div>
+
+              {/* Cash Income List */}
+              {cashDetails.cashIncome.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">💵 Entradas em Dinheiro</h3>
+                  <div className="space-y-2">
+                    {cashDetails.cashIncome.map((transaction) => (
+                      <div
+                        key={transaction.id}
+                        className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-200 dark:border-green-500/20"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {transaction.category}
+                          </p>
+                          {transaction.description && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {transaction.description}
+                            </p>
+                          )}
+                          {transaction.barbers?.name && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {transaction.barbers.name}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                            +{formatCurrency(transaction.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cash Expenses List */}
+              {cashDetails.cashExpenses.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">💸 Saídas em Dinheiro</h3>
+                  <div className="space-y-2">
+                    {cashDetails.cashExpenses.map((transaction) => (
+                      <div
+                        key={transaction.id}
+                        className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {transaction.category}
+                          </p>
+                          {transaction.description && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {transaction.description}
+                            </p>
+                          )}
+                          {transaction.barbers?.name && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {transaction.barbers.name}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                            -{formatCurrency(transaction.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {cashDetails.cashIncome.length === 0 && 
+               cashDetails.cashExpenses.length === 0 && (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  </svg>
+                  <p className="text-gray-600 dark:text-gray-400">Nenhuma transação em dinheiro no período</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 dark:border-[#2A2A2A] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Saldo em Espécie</p>
+                  <p className={`text-3xl font-bold ${
+                    (cashDetails.cashIncome.reduce((sum, t) => sum + parseFloat(t.amount), 0) -
+                     cashDetails.cashExpenses.reduce((sum, t) => sum + parseFloat(t.amount), 0)) >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {formatCurrency(
+                      cashDetails.cashIncome.reduce((sum, t) => sum + parseFloat(t.amount), 0) -
+                      cashDetails.cashExpenses.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsCashDetailOpen(false)}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profit Detail Modal */}
+      {isProfitDetailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="relative bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-4xl border border-gray-200 dark:border-[#2A2A2A] shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalhamento do Lucro Líquido</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{getPeriodLabel()}</p>
+              </div>
+              <button 
+                onClick={() => setIsProfitDetailOpen(false)} 
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Receita Total</p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-1">
+                    {formatCurrency(profitDetails.totalIncome)}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    {profitDetails.incomeItems.length} itens
+                  </p>
+                </div>
+
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Despesas Total</p>
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">
+                    {formatCurrency(profitDetails.totalExpenses)}
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    {profitDetails.expenseItems.length} itens
+                  </p>
+                </div>
+
+                <div className={`rounded-xl p-4 ${
+                  (profitDetails.totalIncome - profitDetails.totalExpenses) >= 0
+                    ? 'bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20'
+                    : 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    (profitDetails.totalIncome - profitDetails.totalExpenses) >= 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>Lucro Líquido</p>
+                  <p className={`text-2xl font-bold mt-1 ${
+                    (profitDetails.totalIncome - profitDetails.totalExpenses) >= 0
+                      ? 'text-green-700 dark:text-green-300'
+                      : 'text-red-700 dark:text-red-300'
+                  }`}>
+                    {formatCurrency(profitDetails.totalIncome - profitDetails.totalExpenses)}
+                  </p>
+                  <p className={`text-xs mt-1 ${
+                    (profitDetails.totalIncome - profitDetails.totalExpenses) >= 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    Receita - Despesas
+                  </p>
+                </div>
+              </div>
+
+              {/* Income Items */}
+              {profitDetails.incomeItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">📈 Receitas</h3>
+                  <div className="space-y-2">
+                    {profitDetails.incomeItems.map((item, index) => (
+                      <div
+                        key={`income-${index}`}
+                        className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-200 dark:border-blue-500/20"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {item.client_name || item.category}
+                          </p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {item.services?.name || item.description || 'Entrada manual'}
+                          </p>
+                          {item.barbers?.name && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {item.barbers.name}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {item.start_time 
+                              ? new Date(item.start_time).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              : new Date(item.date).toLocaleDateString('pt-BR')
+                            }
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            +{formatCurrency(item.services?.price || item.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expense Items */}
+              {profitDetails.expenseItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">📉 Despesas</h3>
+                  <div className="space-y-2">
+                    {profitDetails.expenseItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {item.category}
+                          </p>
+                          {item.description && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {item.description}
+                            </p>
+                          )}
+                          {item.barbers?.name && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {item.barbers.name}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(item.date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                            -{formatCurrency(item.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {profitDetails.incomeItems.length === 0 && 
+               profitDetails.expenseItems.length === 0 && (
+                <div className="text-center py-12">
+                  <TrendingUp className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">Nenhuma transação encontrada no período</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 dark:border-[#2A2A2A] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Lucro Líquido do Período</p>
+                  <p className={`text-3xl font-bold ${
+                    (profitDetails.totalIncome - profitDetails.totalExpenses) >= 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {formatCurrency(profitDetails.totalIncome - profitDetails.totalExpenses)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsProfitDetailOpen(false)}
                   className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   Fechar
