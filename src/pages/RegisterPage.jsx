@@ -128,12 +128,13 @@ export default function RegisterPage() {
       if (authError) {
         // Se o erro for "User already registered", é um usuário órfão
         if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
-          setError(
+          showToast.error(
             'Este email já foi usado anteriormente mas o cadastro não foi concluído. ' +
             'Para resolver, você tem 2 opções:\n\n' +
             '1. Use outro email para cadastrar\n' +
             '2. Entre em contato com o suporte para liberar este email\n\n' +
-            'Email de suporte: suporte@brioapp.online'
+            'Email de suporte: suporte@brioapp.online',
+            'Email Já Usado'
           )
           setLoading(false)
           return
