@@ -1757,38 +1757,38 @@ export default function FinanceiroPage() {
 
       {/* Modal - Apple Style */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           {/* Backdrop com blur (vidro fosco) */}
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-md"
             onClick={closeModal}
           />
           
-          {/* Modal Card */}
-          <div className="relative bg-white/95 dark:bg-[#1A1A1A]/95 backdrop-blur-xl rounded-[2.5rem] w-full max-w-md border border-white/10 dark:border-white/5 shadow-2xl animate-fade-in">
+          {/* Modal Card - Otimizado para telas pequenas */}
+          <div className="relative bg-white/95 dark:bg-[#1A1A1A]/95 backdrop-blur-xl rounded-3xl w-full max-w-md border border-white/10 dark:border-white/5 shadow-2xl animate-fade-in max-h-[95vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 pb-4">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="flex items-center justify-between p-4 pb-3 sticky top-0 bg-white/95 dark:bg-[#1A1A1A]/95 backdrop-blur-xl z-10">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 {modalType === 'income' ? 'Nova Entrada' : 'Nova Despesa'}
               </h2>
               <button
                 onClick={closeModal}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all"
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all"
                 disabled={isSaving}
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-5">
+            <form onSubmit={handleSubmit} className="px-4 pb-4 space-y-3">
               {/* Valor com R$ integrado */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Valor *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400 dark:text-gray-500">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-gray-400 dark:text-gray-500">
                     R$
                   </span>
                   <input
@@ -1797,7 +1797,7 @@ export default function FinanceiroPage() {
                     step="0.01"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="w-full pl-14 pr-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white text-lg font-semibold placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                    className="w-full pl-12 pr-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-base font-semibold placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                     placeholder="0,00"
                     required
                     disabled={isSaving}
@@ -1807,15 +1807,15 @@ export default function FinanceiroPage() {
 
               {/* Categoria */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Categoria *
                 </label>
                 <input
                   type="text"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder={modalType === 'income' ? 'Ex: Venda Avulsa' : 'Ex: Aluguel, Luz'}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  placeholder={modalType === 'income' ? 'Ex: Aluguel, Luz' : 'Ex: Aluguel, Luz'}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   required
                   disabled={isSaving}
                 />
@@ -1823,13 +1823,13 @@ export default function FinanceiroPage() {
 
               {/* Método de Pagamento */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Método de Pagamento *
                 </label>
                 <select
                   value={formData.payment_method}
                   onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
                   required
                   disabled={isSaving}
                 >
@@ -1842,13 +1842,13 @@ export default function FinanceiroPage() {
 
               {/* Profissional */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Profissional
                 </label>
                 <select
                   value={formData.barber_id}
                   onChange={(e) => setFormData({ ...formData, barber_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
                   disabled={isSaving}
                 >
                   <option value="">Nenhum</option>
@@ -1862,14 +1862,14 @@ export default function FinanceiroPage() {
 
               {/* Data */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Data *
                 </label>
                 <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   required
                   disabled={isSaving}
                 />
@@ -1877,14 +1877,14 @@ export default function FinanceiroPage() {
 
               {/* Descrição */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                   Descrição
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows="3"
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
+                  rows="2"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
                   placeholder="Informações adicionais (opcional)"
                   disabled={isSaving}
                 />
@@ -1892,21 +1892,21 @@ export default function FinanceiroPage() {
 
               {/* Recurring Expense Option (only for expenses) */}
               {modalType === 'expense' && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl border border-indigo-200 dark:border-indigo-500/20">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5 p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl border border-indigo-200 dark:border-indigo-500/20">
                     <input
                       type="checkbox"
                       id="is_recurring"
                       checked={formData.is_recurring}
                       onChange={(e) => setFormData({ ...formData, is_recurring: e.target.checked })}
-                      className="w-5 h-5 text-indigo-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-indigo-500"
                       disabled={isSaving}
                     />
                     <label htmlFor="is_recurring" className="flex-1 cursor-pointer">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white">
                         Despesa Recorrente
                       </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                      <p className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">
                         Lançar automaticamente todo mês
                       </p>
                     </label>
@@ -1914,13 +1914,13 @@ export default function FinanceiroPage() {
 
                   {formData.is_recurring && (
                     <div>
-                      <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                        Dia do Mês para Lançamento *
+                      <label className="block text-[9px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                        Dia do Mês *
                       </label>
                       <select
                         value={formData.recurrence_day}
                         onChange={(e) => setFormData({ ...formData, recurrence_day: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
                         required={formData.is_recurring}
                         disabled={isSaving}
                       >
@@ -1934,22 +1934,22 @@ export default function FinanceiroPage() {
                 </div>
               )}
 
-              {/* Action Buttons - Apple Style */}
-              <div className="flex gap-3 pt-4">
-                {/* Cancel Button - Ghost Style */}
+              {/* Action Buttons - Compacto */}
+              <div className="flex gap-2 pt-2">
+                {/* Cancel Button */}
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-full transition-all active:scale-95"
+                  className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-full transition-all active:scale-95"
                   disabled={isSaving}
                 >
                   Cancelar
                 </button>
                 
-                {/* Save Button - Vibrant & Rounded */}
+                {/* Save Button */}
                 <button
                   type="submit"
-                  className={`flex-1 px-6 py-3 text-white font-semibold rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`flex-1 px-4 py-2.5 text-white text-sm font-semibold rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
                     modalType === 'income'
                       ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 shadow-green-500/30'
                       : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 shadow-red-500/30'
@@ -1958,7 +1958,7 @@ export default function FinanceiroPage() {
                 >
                   {isSaving ? (
                     <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>

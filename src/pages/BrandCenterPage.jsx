@@ -492,23 +492,17 @@ export default function ConfiguracoesPage() {
 
   const copyBookingLink = async () => {
     try {
-      // Get first barber ID for the booking link
-      const { data: barbers } = await supabase
-        .from('barbers')
-        .select('id')
-        .eq('barbershop_id', barbershopId)
-        .limit(1)
-
-      if (barbers && barbers.length > 0) {
-        const bookingUrl = `${window.location.origin}/booking/${barbers[0].id}`
-        await navigator.clipboard.writeText(bookingUrl)
-        setCopied(true)
-        showToast.success(
-          'Link copiado para a área de transferência!',
-          'Link Copiado'
-        )
-        setTimeout(() => setCopied(false), 3000)
-      }
+      // Use the same format as "View as Client" button
+      const barbershopSlug = formData.name?.toLowerCase().replace(/\s+/g, '-') || 'barbearia'
+      const bookingUrl = `${window.location.origin}/${barbershopSlug}`
+      
+      await navigator.clipboard.writeText(bookingUrl)
+      setCopied(true)
+      showToast.success(
+        'Link copiado para a área de transferência!',
+        'Link Copiado'
+      )
+      setTimeout(() => setCopied(false), 3000)
     } catch (err) {
       console.error('Erro ao copiar link:', err)
       showToast.error(
@@ -584,7 +578,7 @@ export default function ConfiguracoesPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
                   <p className="text-xs md:text-sm font-mono text-gray-700 dark:text-gray-300 truncate">
-                    {window.location.origin}/booking/...
+                    {window.location.origin}/{formData.name?.toLowerCase().replace(/\s+/g, '-') || 'barbearia'}
                   </p>
                 </div>
                 <button
