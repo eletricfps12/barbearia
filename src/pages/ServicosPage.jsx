@@ -236,8 +236,11 @@ export default function ServicosPage() {
     ? groupedServices 
     : { [selectedBarberFilter]: groupedServices[selectedBarberFilter] }
 
-  // Opções de duração (em minutos)
-  const durationOptions = [20, 25, 30, 35, 40, 45, 50, 55, 60, 90]
+  // Opções de duração (em minutos) - até 3 horas
+  const durationOptions = [
+    20, 25, 30, 35, 40, 45, 50, 55, 60, // até 1h
+    90, 120, 150, 180 // 1h30, 2h, 2h30, 3h
+  ]
 
   return (
     <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen overflow-x-hidden max-w-full">
@@ -500,9 +503,20 @@ export default function ServicosPage() {
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {durationOptions.map((duration) => {
                       const isSelected = formData.duration_minutes === duration.toString()
-                      const displayText = duration >= 60 
-                        ? duration === 60 ? '1h' : `${Math.floor(duration / 60)}h ${duration % 60}m`
-                        : `${duration} min`
+                      
+                      // Formatar exibição da duração
+                      let displayText
+                      if (duration < 60) {
+                        displayText = `${duration} min`
+                      } else {
+                        const hours = Math.floor(duration / 60)
+                        const minutes = duration % 60
+                        if (minutes === 0) {
+                          displayText = `${hours}h`
+                        } else {
+                          displayText = `${hours}h ${minutes}m`
+                        }
+                      }
                       
                       return (
                         <button
