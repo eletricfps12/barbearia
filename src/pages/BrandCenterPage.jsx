@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { showToast } from '../components/Toast'
 import { 
   Upload, Save, Loader2, Image as ImageIcon, X, Clock, 
-  Copy, Check, Instagram, Facebook, MapPin, Share2, Palette, Eye, MessageCircle
+  Copy, Check, Instagram, Facebook, MapPin, Share2, Palette, Eye, MessageCircle, Search
 } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 
@@ -221,47 +221,48 @@ export default function ConfiguracoesPage() {
   }
 
   // Buscar CEP via ViaCEP
-  const handleCepChange = async (e) => {
-    const cep = e.target.value.replace(/\D/g, '') // Remove não-números
+  const handleCepSearch = async () => {
+    const cep = formData.cep.replace(/\D/g, '') // Remove não-números
     
-    setFormData(prev => ({ ...prev, cep: e.target.value }))
-    
-    if (cep.length === 8) {
-      try {
-        setLoadingCep(true)
-        
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
-        const data = await response.json()
-        
-        if (data.erro) {
-          showToast.error('CEP não encontrado', 'Erro')
-          return
-        }
-        
-        // Preencher campos automaticamente
-        setFormData(prev => ({
-          ...prev,
-          street: data.logradouro || '',
-          neighborhood: data.bairro || '',
-          city: data.localidade || '',
-          state: data.uf || '',
-          // Montar endereço completo (sem número ainda)
-          address: `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`
-        }))
-        
-        showToast.success('CEP encontrado! Preencha o número.', 'Sucesso')
-        
-        // Focar no campo de número
-        setTimeout(() => {
-          document.getElementById('number')?.focus()
-        }, 100)
-        
-      } catch (error) {
-        console.error('Erro ao buscar CEP:', error)
-        showToast.error('Erro ao buscar CEP. Tente novamente.', 'Erro')
-      } finally {
-        setLoadingCep(false)
+    if (cep.length !== 8) {
+      showToast.error('CEP deve ter 8 dígitos', 'Erro')
+      return
+    }
+
+    try {
+      setLoadingCep(true)
+      
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      const data = await response.json()
+      
+      if (data.erro) {
+        showToast.error('CEP não encontrado', 'Erro')
+        return
       }
+      
+      // Preencher campos automaticamente
+      setFormData(prev => ({
+        ...prev,
+        street: data.logradouro || '',
+        neighborhood: data.bairro || '',
+        city: data.localidade || '',
+        state: data.uf || '',
+        // Montar endereço completo (sem número ainda)
+        address: `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`
+      }))
+      
+      showToast.success('CEP encontrado! Preencha o número.', 'Sucesso')
+      
+      // Focar no campo de número
+      setTimeout(() => {
+        document.getElementById('number')?.focus()
+      }, 100)
+      
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error)
+      showToast.error('Erro ao buscar CEP. Tente novamente.', 'Erro')
+    } finally {
+      setLoadingCep(false)
     }
   }
 
@@ -770,26 +771,41 @@ export default function ConfiguracoesPage() {
                     Endereço *
                   </label>
                   
-                  {/* CEP */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="cep"
-                      name="cep"
-                      value={formData.cep}
-                      onChange={handleCepChange}
-                      maxLength={9}
-                      className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all"
-                      placeholder="CEP (ex: 12345-678)"
-                    />
-                    {loadingCep && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                      </div>
-                    )}
+                  {/* CEP with Search Button */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        id="cep"
+                        name="cep"
+                        value={formData.cep}
+                        onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
+                        maxLength={9}
+                        className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all"
+                        placeholder="CEP (opcional)"
+                      />
+                      {loadingCep && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCepSearch}
+                      disabled={loadingCep || !formData.cep || formData.cep.replace(/\D/g, '').length !== 8}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all flex items-center gap-2"
+                    >
+                      {loadingCep ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Search className="w-5 h-5" />
+                      )}
+                      Buscar
+                    </button>
                   </div>
 
-                  {/* Street (auto-filled) */}
+                  {/* Street (editable) */}
                   <input
                     type="text"
                     id="street"
@@ -797,8 +813,7 @@ export default function ConfiguracoesPage() {
                     value={formData.street}
                     onChange={handleAddressFieldChange}
                     className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all"
-                    placeholder="Rua (preenchido automaticamente)"
-                    readOnly
+                    placeholder="Rua"
                   />
 
                   {/* Number and Complement */}
@@ -809,9 +824,8 @@ export default function ConfiguracoesPage() {
                       name="number"
                       value={formData.number}
                       onChange={handleAddressFieldChange}
-                      required
                       className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all"
-                      placeholder="Número *"
+                      placeholder="Número"
                     />
                     <input
                       type="text"
@@ -824,7 +838,7 @@ export default function ConfiguracoesPage() {
                     />
                   </div>
 
-                  {/* Neighborhood, City, State (auto-filled) */}
+                  {/* Neighborhood, City, State (editable) */}
                   <div className="grid grid-cols-3 gap-3">
                     <input
                       type="text"
@@ -834,16 +848,15 @@ export default function ConfiguracoesPage() {
                       onChange={handleAddressFieldChange}
                       className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all"
                       placeholder="Bairro"
-                      readOnly
                     />
                     <input
                       type="text"
                       id="city"
                       name="city"
                       value={formData.city}
+                      onChange={handleAddressFieldChange}
                       className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all"
                       placeholder="Cidade"
-                      readOnly
                     />
                     <input
                       type="text"
