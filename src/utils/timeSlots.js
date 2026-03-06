@@ -69,15 +69,36 @@ export function generateAvailableSlots(date, serviceDuration, existingAppointmen
   const endHourMinutes = timeToMinutes(closeTime)
   
   // MISSÃO 1: Verificar se a data escolhida é HOJE (timezone Brasil)
-  const selectedDate = new Date(date + 'T00:00:00')
-  const now = new Date()
+  // Criar data selecionada sem timezone para comparação
+  const [year, month, day] = date.split('-').map(Number)
+  const selectedDate = new Date(year, month - 1, day)
   
-  // Obter data atual no timezone de São Paulo
+  // Obter data e hora atual no timezone de São Paulo
+  const now = new Date()
   const nowInBrazil = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
   const todayInBrazil = new Date(nowInBrazil.getFullYear(), nowInBrazil.getMonth(), nowInBrazil.getDate())
   
   const isToday = selectedDate.getTime() === todayInBrazil.getTime()
-  const currentTimeMinutes = isToday ? (nowInBrazil.getHours() * 60 + nowInBrazil.getMinutes()) : 0
+  
+  // Hora atual em minutos (com margem de segurança de 30 minutos para preparação)
+  const currentHour = nowInBrazil.getHours()
+  const currentMinute = nowInBrazil.getMinutes()
+  const currentTimeMinutes = isToday ? (currentHour * 60 + currentMinute + 30) : 0
+  
+  console.log('🕐 Gerando slots:', {
+    date,
+    selectedDate: selectedDate.toLocaleDateString('pt-BR'),
+    todayInBrazil: todayInBrazil.toLocaleDateString('pt-BR'),
+    isToday,
+    nowInBrazil: nowInBrazil.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    currentTime: `${currentHour}:${currentMinute}`,
+    currentTimeMinutes,
+    currentTimeWithMargin: `${Math.floor(currentTimeMinutes / 60)}:${(currentTimeMinutes % 60).toString().padStart(2, '0')}`,
+    openTime,
+    closeTime,
+    startHourMinutes,
+    endHourMinutes
+  })
   
   // Generate slots from opening to closing time
   for (let slotMinutes = startHourMinutes; slotMinutes < endHourMinutes; slotMinutes += slotInterval) {
@@ -88,12 +109,15 @@ export function generateAvailableSlots(date, serviceDuration, existingAppointmen
     
     // Check if the complete service fits within business hours
     if (timeToMinutes(slotEnd) > endHourMinutes) {
+      console.log(`⏭️ Slot ${slotTime} ultrapassa horário de fechamento`)
       continue
     }
     
     // MISSÃO 1: Bloquear horários passados se for hoje
+    // Bloqueia se o horário do slot já passou OU se está muito próximo (menos de 30 min)
     if (isToday && slotMinutes <= currentTimeMinutes) {
-      continue // Pula horários que já passaram
+      console.log(`⏭️ Bloqueando horário passado: ${slotTime} (slot: ${slotMinutes} <= atual+30min: ${currentTimeMinutes})`)
+      continue // Pula horários que já passaram ou estão muito próximos
     }
     
     // Check for conflicts with existing appointments
@@ -101,9 +125,19 @@ export function generateAvailableSlots(date, serviceDuration, existingAppointmen
       timesOverlap(slotTime, slotEnd, apt.start_time, apt.end_time)
     )
     
+    if (hasConflict) {
+      console.log(`❌ Slot ${slotTime} tem conflito com agendamento existente`)
+    }
+    
     if (!hasConflict) {
       slots.push({ time: slotTime, available: true })
     }
+  }
+  
+  console.log(`✅ Total de slots disponíveis: ${slots.length}`)
+  if (slots.length > 0) {
+    console.log(`   Primeiro slot: ${slots[0].time}`)
+    console.log(`   Último slot: ${slots[slots.length - 1].time}`)
   }
   
   return slots
