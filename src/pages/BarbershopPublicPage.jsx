@@ -213,11 +213,26 @@ export default function BarbershopPublicPage() {
         dayOfWeek,
         openTime,
         closeTime,
-        isClosed: businessHours.is_closed
+        isClosed: businessHours.is_closed,
+        selectedDate: selectedDate.toLocaleDateString('pt-BR'),
+        selectedDateObj: selectedDate
       })
 
       // 6. Gerar slots disponíveis usando horários reais do banco
-      const dateStr = selectedDate.toISOString().split('T')[0]
+      // Formatar data no formato YYYY-MM-DD sem conversão de timezone
+      const year = selectedDate.getFullYear()
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+      const day = String(selectedDate.getDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+      
+      console.log('📅 Data formatada para slots:', {
+        selectedDate: selectedDate.toLocaleDateString('pt-BR'),
+        dateStr,
+        year,
+        month,
+        day
+      })
+      
       const slots = generateAvailableSlots(
         dateStr,
         selectedService.duration_minutes,
@@ -424,11 +439,16 @@ export default function BarbershopPublicPage() {
    */
   const generateDateOptions = () => {
     const dates = []
-    const today = new Date()
+    
+    // Obter data atual no timezone de São Paulo
+    const now = new Date()
+    const nowInBrazil = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
     
     for (let i = 0; i < 14; i++) {
-      const date = new Date(today)
+      const date = new Date(nowInBrazil)
       date.setDate(date.getDate() + i)
+      // Normalizar para meia-noite para evitar problemas de comparação
+      date.setHours(0, 0, 0, 0)
       dates.push(date)
     }
     
