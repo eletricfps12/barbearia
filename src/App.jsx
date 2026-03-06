@@ -25,6 +25,7 @@ import SuperAdminLogin from './pages/SuperAdminLogin'
 import SuperAdminRoute from './components/SuperAdminRoute'
 import RegisterPage from './pages/RegisterPage'
 import PendingApprovalPage from './pages/PendingApprovalPage'
+import AjudaPage from './pages/AjudaPage'
 import { Loader2 } from 'lucide-react'
 
 /**
@@ -173,6 +174,7 @@ function App() {
           <Route path="equipe" element={<EquipePage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
           <Route path="assinantes" element={<AssinantesPage />} />
+          <Route path="ajuda" element={<AjudaPage />} />
         </Route>
         
         {/* Rota Super Admin - Protegida */}

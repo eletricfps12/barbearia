@@ -29,7 +29,8 @@ const navigationItems = [
   { path: '/admin/equipe', icon: Users, label: 'Equipe' },
   { path: '/admin/servicos', icon: Scissors, label: 'Serviços' },
   { path: '/admin/identidade', icon: Palette, label: 'Identidade Visual' },
-  { path: '/admin/operacional', icon: Sliders, label: 'Ajustes Operacionais' }
+  { path: '/admin/operacional', icon: Sliders, label: 'Ajustes Operacionais' },
+  { path: '/admin/ajuda', icon: HelpCircle, label: 'Ajuda' }
 ]
 
 export default function Sidebar({ onLinkClick }) {
