@@ -358,23 +358,27 @@ export default function DashboardHome() {
               </p>
             </div>
             
-            {/* Status Badge */}
+            {/* Status Toggle - Mais Destacado */}
             <div 
-              className="flex items-center gap-2 px-4 py-2 rounded-full flex-shrink-0"
+              className="flex items-center gap-3 px-6 py-3 rounded-2xl flex-shrink-0 shadow-lg"
               style={{
-                background: dashboardData.isOpen ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                border: dashboardData.isOpen ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)'
+                background: dashboardData.isOpen 
+                  ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1))' 
+                  : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1))',
+                border: dashboardData.isOpen 
+                  ? '2px solid rgba(34, 197, 94, 0.4)' 
+                  : '2px solid rgba(239, 68, 68, 0.4)'
               }}
             >
               {dashboardData.isOpen ? (
                 <>
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span className="text-sm font-semibold text-green-500">Aberto</span>
+                  <CheckCircle className="w-6 h-6 text-green-500" />
+                  <span className="text-base font-bold text-green-500">Aberto</span>
                 </>
               ) : (
                 <>
-                  <XCircle className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-semibold text-red-500">Fechado</span>
+                  <XCircle className="w-6 h-6 text-red-500" />
+                  <span className="text-base font-bold text-red-500">Fechado</span>
                 </>
               )}
             </div>
@@ -563,7 +567,7 @@ export default function DashboardHome() {
               className="text-xs mt-2"
               style={{ color: 'var(--text-secondary)' }}
             >
-              {dashboardData.filledSlots} de {dashboardData.totalSlots} horários preenchidos
+              {dashboardData.filledSlots} de {dashboardData.totalSlots} horários disponíveis hoje
             </p>
           </div>
 
@@ -746,40 +750,60 @@ export default function DashboardHome() {
                 const statusInfo = getStatusBadge(appointment.status)
                 const appointmentTime = new Date(appointment.start_time)
                 
+                // Definir cor da barra lateral baseado no status
+                const getStatusBarColor = (status) => {
+                  switch (status) {
+                    case 'confirmed':
+                      return 'bg-blue-500'
+                    case 'completed':
+                      return 'bg-green-500'
+                    case 'no_show':
+                      return 'bg-red-500'
+                    case 'cancelled':
+                      return 'bg-gray-500'
+                    default:
+                      return 'bg-gray-400'
+                  }
+                }
+                
                 return (
                   <div
                     key={appointment.id}
-                    className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-4 hover:border-white/20 transition-all"
+                    className="relative bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      {/* Info do Agendamento */}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-lg font-bold text-gray-900 dark:text-white">
-                            {appointmentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            statusInfo.color === 'green' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' :
-                            statusInfo.color === 'blue' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
-                            statusInfo.color === 'red' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
-                            'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
-                          }`}>
-                            {statusInfo.label}
-                          </span>
+                    {/* Barra Colorida Lateral */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${getStatusBarColor(appointment.status)}`} />
+                    
+                    <div className="p-4 pl-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        {/* Info do Agendamento */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
+                              {appointmentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              statusInfo.color === 'green' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' :
+                              statusInfo.color === 'blue' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
+                              statusInfo.color === 'red' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
+                              'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
+                            }`}>
+                              {statusInfo.label}
+                            </span>
+                          </div>
+                          <p className="text-gray-900 dark:text-white font-semibold">
+                            {appointment.client_name}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {appointment.services?.name} • {appointment.barbers?.name}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {appointment.client_phone}
+                          </p>
                         </div>
-                        <p className="text-gray-900 dark:text-white font-semibold">
-                          {appointment.client_name}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {appointment.services?.name} • {appointment.barbers?.name}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {appointment.client_phone}
-                        </p>
-                      </div>
 
-                      {/* Botões de Ação */}
-                      <div className="flex gap-2">
+                        {/* Botões de Ação */}
+                        <div className="flex gap-2">
                         {appointment.status === 'confirmed' && (
                           <>
                             <button
@@ -816,6 +840,7 @@ export default function DashboardHome() {
                             Restaurar
                           </button>
                         )}
+                        </div>
                       </div>
                     </div>
                   </div>

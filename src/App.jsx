@@ -104,9 +104,9 @@ function App() {
   return (
     <LoadingProvider>
       <ToastContainer />
-      <GlobalLoader />
+      {/* GlobalLoader desabilitado - removido loading entre páginas */}
       <BrowserRouter>
-        <RouteChangeListener />
+        {/* RouteChangeListener desabilitado - removido loading entre páginas */}
         <Routes>
           {/* Landing Page */}
           <Route path="/" element={<LandingPage />} />

@@ -23,7 +23,7 @@ SELECT cron.schedule(
     net.http_post(
       url:='https://cntdiuaxocutsqwqnrkd.supabase.co/functions/v1/process-reminders',
       headers:=jsonb_build_object(
-        'Content-Type', 'application/json',
+        'Content-Type', 'application/json',c:\Users\gsant\AppData\Local\Packages\5319275A.WhatsAppDesktop_cv1g1gvanyjgm\LocalState\sessions\A299DA9A00786592B0506B5F806AAC819DB231BC\transfers\2026-10\WhatsApp Image 2026-03-06 at 16.28.52.jpeg
         'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
       ),
       body:='{}'::jsonb
