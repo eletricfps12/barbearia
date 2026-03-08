@@ -11,7 +11,10 @@ import {
   ArrowRight,
   Check,
   Star,
-  ChevronDown
+  ChevronDown,
+  Shield,
+  Clock,
+  TrendingDown
 } from 'lucide-react'
 
 export default function LandingPage() {
@@ -97,7 +100,7 @@ export default function LandingPage() {
               onClick={() => navigate('/register')}
               className="px-4 sm:px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold rounded-full hover:scale-105 transition-transform text-sm sm:text-base whitespace-nowrap"
             >
-              Começar Grátis
+              Testar 14 Dias Grátis
             </button>
           </div>
         </nav>
@@ -108,9 +111,9 @@ export default function LandingPage() {
             <div className="text-center space-y-8">
               
               {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-semibold">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-semibold animate-pulse">
                 <Sparkles className="w-4 h-4" />
-                <span>O futuro da gestão de barbearias</span>
+                <span>14 dias grátis • Sem cartão de crédito</span>
               </div>
 
               {/* Main Headline - Gigante e Desconstruído */}
@@ -143,7 +146,7 @@ export default function LandingPage() {
                   className="group relative px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold rounded-2xl text-lg overflow-hidden hover:scale-105 transition-all shadow-2xl shadow-green-500/50"
                 >
                   <span className="relative z-10 flex items-center gap-2">
-                    Começar Grátis Agora
+                    Começar 14 Dias Grátis
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -153,6 +156,11 @@ export default function LandingPage() {
                   Ver Demo
                 </button>
               </div>
+
+              {/* Trust Badge */}
+              <p className="text-gray-500 text-sm pt-4">
+                Sem cartão de crédito • Sem compromisso • Cancele quando quiser
+              </p>
 
               {/* Social Proof */}
               <div className="flex items-center justify-center gap-8 pt-12 text-sm">
@@ -176,6 +184,180 @@ export default function LandingPage() {
               <div className="pt-16 animate-bounce">
                 <ChevronDown className="w-8 h-8 text-gray-600 mx-auto" />
               </div>
+            </div>
+          </div>
+        </section>
+
+
+        {/* Social Proof Section - Depoimentos */}
+        <section className="py-32 px-4 relative">
+          <div className="max-w-7xl mx-auto">
+            
+            <div className="text-center mb-16">
+              <h2 className="text-5xl md:text-7xl font-black text-white mb-4">
+                QUEM JÁ USA
+                <span className="block bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
+                  APROVA
+                </span>
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              
+              {/* Depoimento 1 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 hover:-translate-y-2 transition-all duration-500">
+                  <div className="flex gap-1 mb-4">
+                    {[1,2,3,4,5].map(i => (
+                      <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-gray-300 text-lg mb-6 leading-relaxed">
+                    "Reduzi <span className="text-green-400 font-bold">80% das faltas</span> em 2 semanas com os lembretes automáticos. Meu faturamento aumentou muito!"
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-black font-bold text-lg">
+                      RC
+                    </div>
+                    <div>
+                      <p className="text-white font-bold">Rafael Costa</p>
+                      <p className="text-gray-500 text-sm">Barbearia Premium • São Paulo</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Depoimento 2 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 hover:-translate-y-2 transition-all duration-500">
+                  <div className="flex gap-1 mb-4">
+                    {[1,2,3,4,5].map(i => (
+                      <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-gray-300 text-lg mb-6 leading-relaxed">
+                    "Economizo <span className="text-green-400 font-bold">mais de 2 horas por dia</span> que gastava no WhatsApp. Agora foco só em cortar cabelo."
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-cyan-600 flex items-center justify-center text-black font-bold text-lg">
+                      MS
+                    </div>
+                    <div>
+                      <p className="text-white font-bold">Marcelo Silva</p>
+                      <p className="text-gray-500 text-sm">Barber Shop Elite • Rio de Janeiro</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Depoimento 3 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-600 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 hover:-translate-y-2 transition-all duration-500">
+                  <div className="flex gap-1 mb-4">
+                    {[1,2,3,4,5].map(i => (
+                      <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-gray-300 text-lg mb-6 leading-relaxed">
+                    "Minha equipe de 4 barbeiros está <span className="text-green-400 font-bold">100% organizada</span>. Acabou a bagunça de papel e caderno."
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-600 flex items-center justify-center text-black font-bold text-lg">
+                      TA
+                    </div>
+                    <div>
+                      <p className="text-white font-bold">Thiago Almeida</p>
+                      <p className="text-gray-500 text-sm">Barbearia Moderna • Belo Horizonte</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Logos de Parceiros */}
+            <div className="mt-20 text-center">
+              <p className="text-gray-500 text-sm mb-8 uppercase tracking-wider">Barbearias que confiam no Brio</p>
+              <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+                {['Barbearia Premium', 'Barber Shop Elite', 'Barbearia Moderna', 'The Barbers', 'Classic Barber'].map((name, i) => (
+                  <div key={i} className="text-gray-600 font-bold text-lg hover:text-gray-400 transition-colors">
+                    {name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+
+        {/* Results Section - Métricas */}
+        <section className="py-32 px-4 relative overflow-hidden">
+          {/* Background Effect */}
+          <div className="absolute inset-0 bg-gradient-to-b from-green-500/5 via-transparent to-green-500/5" />
+          
+          <div className="max-w-7xl mx-auto relative z-10">
+            
+            <div className="text-center mb-20">
+              <h2 className="text-5xl md:text-7xl font-black text-white mb-6">
+                RESULTADOS
+                <span className="block bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
+                  REAIS
+                </span>
+              </h2>
+              <p className="text-xl text-gray-400">De quem já usa o Brio App</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              
+              {/* Métrica 1 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-600 rounded-3xl blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-10 text-center hover:-translate-y-2 transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto mb-6">
+                    <TrendingDown className="w-8 h-8 text-red-400" />
+                  </div>
+                  <div className="text-7xl font-black bg-gradient-to-r from-red-400 to-orange-600 bg-clip-text text-transparent mb-4">
+                    -80%
+                  </div>
+                  <p className="text-xl text-white font-bold mb-2">Menos Faltas</p>
+                  <p className="text-gray-400">Com lembretes automáticos por email e WhatsApp</p>
+                </div>
+              </div>
+
+              {/* Métrica 2 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-10 text-center hover:-translate-y-2 transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center mx-auto mb-6">
+                    <Clock className="w-8 h-8 text-green-400" />
+                  </div>
+                  <div className="text-7xl font-black bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent mb-4">
+                    +2h
+                  </div>
+                  <p className="text-xl text-white font-bold mb-2">Por Dia Economizadas</p>
+                  <p className="text-gray-400">Sem perder tempo com WhatsApp e ligações</p>
+                </div>
+              </div>
+
+              {/* Métrica 3 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-3xl blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-10 text-center hover:-translate-y-2 transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center mx-auto mb-6">
+                    <Calendar className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <div className="text-7xl font-black bg-gradient-to-r from-blue-400 to-cyan-600 bg-clip-text text-transparent mb-4">
+                    100%
+                  </div>
+                  <p className="text-xl text-white font-bold mb-2">Agendamentos Organizados</p>
+                  <p className="text-gray-400">Acabou a bagunça de papel e caderno</p>
+                </div>
+              </div>
+
             </div>
           </div>
         </section>
@@ -510,9 +692,9 @@ export default function LandingPage() {
                 <div className="relative bg-zinc-900 border border-white/10 rounded-3xl p-10 hover:border-green-500/50 transition-all duration-500">
                   
                   {/* Badge */}
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-semibold mb-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-semibold mb-6 animate-pulse">
                     <Zap className="w-4 h-4" />
-                    Mais Popular
+                    14 Dias Grátis
                   </div>
 
                   {/* Título */}
@@ -554,8 +736,11 @@ export default function LandingPage() {
                     onClick={() => navigate('/register')}
                     className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold rounded-2xl text-lg hover:scale-105 transition-transform shadow-2xl shadow-green-500/50"
                   >
-                    Começar Agora
+                    Começar 14 Dias Grátis
                   </button>
+                  <p className="text-gray-500 text-xs text-center mt-3">
+                    Sem cartão de crédito
+                  </p>
 
                 </div>
               </div>
@@ -568,9 +753,9 @@ export default function LandingPage() {
                 <div className="relative bg-gradient-to-br from-zinc-900 to-zinc-950 border border-white/10 rounded-3xl p-10 hover:border-purple-500/50 transition-all duration-500">
                   
                   {/* Badge */}
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400 text-sm font-semibold mb-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400 text-sm font-semibold mb-6 animate-pulse">
                     <Sparkles className="w-4 h-4" />
-                    Melhor Custo-Benefício
+                    14 Dias Grátis + Melhor Custo-Benefício
                   </div>
 
                   {/* Título */}
@@ -619,27 +804,120 @@ export default function LandingPage() {
                     onClick={() => navigate('/register')}
                     className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-2xl text-lg hover:scale-105 transition-transform shadow-2xl shadow-purple-500/50"
                   >
-                    Assinar Anual
+                    Começar 14 Dias Grátis
                   </button>
+                  <p className="text-gray-500 text-xs text-center mt-3">
+                    Sem cartão de crédito
+                  </p>
 
                 </div>
               </div>
 
             </div>
 
-            {/* Garantia */}
-            <div className="mt-16 text-center">
-              <div className="inline-flex items-center gap-3 px-6 py-4 bg-zinc-900/50 border border-white/10 rounded-2xl">
-                <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <Check className="w-6 h-6 text-green-400" />
-                </div>
-                <div className="text-left">
-                  <p className="text-white font-bold">Garantia de 7 dias</p>
-                  <p className="text-gray-400 text-sm">Não gostou? Devolvemos 100% do seu dinheiro</p>
+            {/* Garantia - Melhorada */}
+            <div className="mt-16">
+              <div className="relative max-w-3xl mx-auto">
+                <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl blur-2xl opacity-30" />
+                <div className="relative bg-zinc-900 border border-green-500/30 rounded-3xl p-8">
+                  <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+                    <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-10 h-10 text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold text-white mb-2">Garantia de 7 dias</p>
+                      <p className="text-gray-400">Não ficou satisfeito? Devolvemos 100% do seu dinheiro. Sem burocracia, sem perguntas.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section className="py-32 px-4 relative">
+          <div className="max-w-4xl mx-auto">
+            
+            <div className="text-center mb-16">
+              <h2 className="text-5xl md:text-7xl font-black text-white mb-4">
+                DÚVIDAS
+                <span className="block bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
+                  FREQUENTES
+                </span>
+              </h2>
+            </div>
+
+            <div className="space-y-6">
+              
+              {/* FAQ 1 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-green-500/30 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-3">Preciso de cartão de crédito para testar?</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    Não! São <span className="text-green-400 font-semibold">14 dias 100% grátis</span> sem precisar cadastrar cartão. Teste todas as funcionalidades sem compromisso.
+                  </p>
+                </div>
+              </div>
+
+              {/* FAQ 2 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-blue-500/30 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-3">É difícil de configurar?</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    Em <span className="text-green-400 font-semibold">menos de 10 minutos</span> sua barbearia está no ar. Interface intuitiva, sem complicação.
+                  </p>
+                </div>
+              </div>
+
+              {/* FAQ 3 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-3">E se eu não gostar?</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    <span className="text-green-400 font-semibold">Devolvemos 100% do seu dinheiro</span>, sem perguntas. Garantia de 7 dias após o pagamento.
+                  </p>
+                </div>
+              </div>
+
+              {/* FAQ 4 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-orange-500/30 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-3">Funciona para barbearia com vários barbeiros?</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    Sim! Gerencie <span className="text-green-400 font-semibold">toda sua equipe em um só lugar</span>. Cada barbeiro tem sua agenda, comissões e métricas individuais.
+                  </p>
+                </div>
+              </div>
+
+              {/* FAQ 5 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-yellow-500/30 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-3">Meus clientes precisam baixar algum app?</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    Não! O agendamento é <span className="text-green-400 font-semibold">100% pelo navegador</span>, sem download. Funciona em qualquer celular.
+                  </p>
+                </div>
+              </div>
+
+              {/* FAQ 6 */}
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity" />
+                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-green-500/30 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-3">Como funciona o suporte?</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    <span className="text-green-400 font-semibold">Suporte prioritário via WhatsApp</span> para todos os planos. Respondemos rápido e resolvemos seu problema.
+                  </p>
+                </div>
+              </div>
+
+            </div>
           </div>
         </section>
 
@@ -666,14 +944,14 @@ export default function LandingPage() {
               className="group relative px-8 md:px-12 py-4 md:py-6 bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold rounded-2xl text-lg md:text-xl overflow-hidden hover:scale-105 transition-all shadow-2xl shadow-green-500/50 w-full sm:w-auto"
             >
               <span className="relative z-10 flex items-center justify-center gap-3">
-                Começar Grátis Agora
+                Começar 14 Dias Grátis
                 <ArrowRight className="w-5 md:w-6 h-5 md:h-6 group-hover:translate-x-2 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
 
             <p className="text-gray-500 text-sm mt-6">
-              Sem cartão de crédito. Sem compromisso.
+              Sem cartão de crédito • Sem compromisso • Cancele quando quiser
             </p>
           </div>
         </section>
