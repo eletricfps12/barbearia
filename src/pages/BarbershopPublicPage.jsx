@@ -536,10 +536,27 @@ export default function BarbershopPublicPage() {
 
         {/* Receipt Card */}
         <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-2xl p-6 w-full max-w-md mt-8 text-left space-y-4">
-          {/* Barber */}
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400">Profissional:</span>
-            <span className="text-white font-semibold">{confirmedBooking.barber.name}</span>
+          {/* Barber with Photo */}
+          <div className="flex items-center gap-4 pb-4 border-b border-[#2A2A2A]">
+            {/* Barber Photo */}
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 flex-shrink-0">
+              {confirmedBooking.barber.avatar_url ? (
+                <img 
+                  src={confirmedBooking.barber.avatar_url} 
+                  alt={confirmedBooking.barber.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold text-xl">
+                  {getInitials(confirmedBooking.barber.name)}
+                </div>
+              )}
+            </div>
+            {/* Barber Info */}
+            <div className="flex-1">
+              <p className="text-gray-400 text-sm">Profissional</p>
+              <p className="text-white font-semibold text-lg">{confirmedBooking.barber.name}</p>
+            </div>
           </div>
 
           {/* Service */}
@@ -915,13 +932,32 @@ export default function BarbershopPublicPage() {
               </button>
             </div>
             
+            {/* Barber Photo Section */}
+            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
+              {/* Barber Photo */}
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                {selectedBarber.avatar_url ? (
+                  <img 
+                    src={selectedBarber.avatar_url} 
+                    alt={selectedBarber.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-white font-bold text-xl">
+                    {getInitials(selectedBarber.name)}
+                  </div>
+                )}
+              </div>
+              {/* Barber Info */}
+              <div className="flex-1">
+                <p className="text-gray-600 text-sm">Profissional</p>
+                <p className="text-black font-semibold text-lg">{selectedBarber.name}</p>
+              </div>
+            </div>
+            
             {/* Summary */}
             <div className="mb-6">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Profissional:</span>
-                  <span className="font-semibold text-black">{selectedBarber.name}</span>
-                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Serviço:</span>
                   <span className="font-semibold text-black">{selectedService.name}</span>

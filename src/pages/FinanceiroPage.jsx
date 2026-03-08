@@ -37,6 +37,11 @@ export default function FinanceiroPage() {
     trend: 0,
     houseProfit: 0 // Lucro da casa (sobra após comissões)
   })
+  const [previousPeriodSummary, setPreviousPeriodSummary] = useState({
+    income: 0,
+    expenses: 0,
+    profit: 0
+  })
   const [chartData, setChartData] = useState([])
   const [expensesByCategory, setExpensesByCategory] = useState([])
   const [transactions, setTransactions] = useState([])
@@ -208,6 +213,53 @@ export default function FinanceiroPage() {
     return { startDate, endDate }
   }
 
+  const getPreviousPeriodRange = () => {
+    const now = new Date()
+    let startDate, endDate
+
+    switch (selectedPeriod) {
+      case 'today':
+        // Ontem
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - 1)
+        startDate.setHours(0, 0, 0, 0)
+        endDate = new Date(now)
+        endDate.setDate(now.getDate() - 1)
+        endDate.setHours(23, 59, 59, 999)
+        break
+      case 'this_week':
+        // Semana anterior
+        const dayOfWeek = now.getDay()
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - dayOfWeek - 7)
+        startDate.setHours(0, 0, 0, 0)
+        endDate = new Date(now)
+        endDate.setDate(now.getDate() - dayOfWeek - 1)
+        endDate.setHours(23, 59, 59, 999)
+        break
+      case 'current_month':
+        // Mês anterior
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+        break
+      case 'last_month':
+        // Dois meses atrás
+        startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+        endDate = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59, 999)
+        break
+      case 'custom':
+        // Para custom, não mostra comparação
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+        break
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+    }
+
+    return { startDate, endDate }
+  }
+
   const calculateCommissions = async (appointmentsData, barbersList, transactionsData) => {
     try {
       // Use the barbersList passed as parameter instead of state
@@ -334,6 +386,76 @@ export default function FinanceiroPage() {
       if (barbersError) throw barbersError
       const barbersList = barbersData || []
       setBarbers(barbersList) // Update state for other uses
+
+      // STEP 0.6: Fetch previous period data for comparison
+      const previousPeriodRange = getPreviousPeriodRange()
+      
+      // Fetch previous period appointments
+      let prevAppointmentsQuery = supabase
+        .from('appointments')
+        .select('services(price), is_subscriber')
+        .eq('barbershop_id', barbershopId)
+        .eq('status', 'completed')
+        .gte('start_time', previousPeriodRange.startDate.toISOString())
+        .lte('start_time', previousPeriodRange.endDate.toISOString())
+
+      if (selectedBarber !== 'all') {
+        prevAppointmentsQuery = prevAppointmentsQuery.eq('barber_id', selectedBarber)
+      }
+
+      let { data: prevAppointmentsData, error: prevAppointmentsError } = await prevAppointmentsQuery
+      
+      if (prevAppointmentsError && prevAppointmentsError.message?.includes('is_subscriber')) {
+        prevAppointmentsQuery = supabase
+          .from('appointments')
+          .select('services(price)')
+          .eq('barbershop_id', barbershopId)
+          .eq('status', 'completed')
+          .gte('start_time', previousPeriodRange.startDate.toISOString())
+          .lte('start_time', previousPeriodRange.endDate.toISOString())
+
+        if (selectedBarber !== 'all') {
+          prevAppointmentsQuery = prevAppointmentsQuery.eq('barber_id', selectedBarber)
+        }
+
+        const result = await prevAppointmentsQuery
+        prevAppointmentsData = result.data
+      }
+
+      // Fetch previous period transactions
+      let prevTransactionsQuery = supabase
+        .from('financial_transactions')
+        .select('type, amount')
+        .eq('barbershop_id', barbershopId)
+        .gte('date', previousPeriodRange.startDate.toISOString().split('T')[0])
+        .lte('date', previousPeriodRange.endDate.toISOString().split('T')[0])
+
+      if (selectedBarber !== 'all') {
+        prevTransactionsQuery = prevTransactionsQuery.eq('barber_id', selectedBarber)
+      }
+
+      const { data: prevTransactionsData } = await prevTransactionsQuery
+
+      const prevAppointmentsIncome = (prevAppointmentsData || [])
+        .filter(apt => !apt.is_subscriber)
+        .reduce((sum, apt) => sum + (apt.services?.price || 0), 0)
+
+      const prevManualIncome = (prevTransactionsData || [])
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+
+      const prevExpenses = (prevTransactionsData || [])
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+
+      const prevTotalIncome = prevAppointmentsIncome + prevManualIncome
+      const prevProfit = prevTotalIncome - prevExpenses
+
+      setPreviousPeriodSummary({
+        income: prevTotalIncome,
+        expenses: prevExpenses,
+        profit: prevProfit
+      })
 
       // 1. Fetch completed appointments (excluding subscribers if column exists)
       let appointmentsQuery = supabase
@@ -871,6 +993,38 @@ export default function FinanceiroPage() {
     }).format(value)
   }
 
+  const calculatePercentageChange = (current, previous) => {
+    if (previous === 0) return current > 0 ? 100 : 0
+    return ((current - previous) / previous) * 100
+  }
+
+  const formatPercentageChange = (current, previous) => {
+    const change = calculatePercentageChange(current, previous)
+    const isPositive = change >= 0
+    const icon = isPositive ? '↑' : '↓'
+    const color = isPositive ? 'text-green-500' : 'text-red-500'
+    
+    return {
+      text: `${icon} ${Math.abs(change).toFixed(1)}%`,
+      color,
+      isPositive
+    }
+  }
+
+  const formatPercentageChangeExpenses = (current, previous) => {
+    const change = calculatePercentageChange(current, previous)
+    const isPositive = change >= 0
+    const icon = isPositive ? '↑' : '↓'
+    // Invertido: aumento de despesas é ruim (vermelho), diminuição é bom (verde)
+    const color = isPositive ? 'text-red-500' : 'text-green-500'
+    
+    return {
+      text: `${icon} ${Math.abs(change).toFixed(1)}%`,
+      color,
+      isPositive
+    }
+  }
+
   const getPeriodLabel = () => {
     const labels = {
       today: 'Hoje',
@@ -975,46 +1129,126 @@ export default function FinanceiroPage() {
         </select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* Primary Cards - Camada Principal (Maiores e Destacados) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Revenue Card */}
-        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Faturamento</span>
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-8 shadow-sm dark:shadow-none">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-base font-semibold text-gray-600 dark:text-gray-400">Faturamento</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={fetchRevenueDetails}
                 className="p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                 title="Ver detalhamento"
               >
-                <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <List className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </button>
-              <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-lg">
-                <DollarSign className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <div className="p-3 bg-blue-100 dark:bg-blue-500/10 rounded-xl">
+                <DollarSign className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(summary.income)}
-              </p>
-              <div className="flex items-center gap-1 mt-1">
-                <ArrowUpRight className="w-4 h-4 text-green-500" />
-                <span className="text-xs text-green-500 font-medium">+2.5%</span>
+          <div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              {formatCurrency(summary.income)}
+            </p>
+            {selectedPeriod !== 'custom' && (
+              <div className="flex items-center gap-1">
+                <span className={`text-sm font-semibold ${formatPercentageChange(summary.income, previousPeriodSummary.income).color}`}>
+                  {formatPercentageChange(summary.income, previousPeriodSummary.income).text}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-500">vs período anterior</span>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Cash Balance Card (NEW) */}
-        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo em Espécie</span>
+        {/* Expenses Card */}
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-8 shadow-sm dark:shadow-none">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-base font-semibold text-gray-600 dark:text-gray-400">Despesas</span>
+            <div className="p-3 bg-red-100 dark:bg-red-500/10 rounded-xl">
+              <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2">
+              {formatCurrency(summary.expenses)}
+            </p>
+            {selectedPeriod !== 'custom' && (
+              <div className="flex items-center gap-1">
+                <span className={`text-sm font-semibold ${formatPercentageChangeExpenses(summary.expenses, previousPeriodSummary.expenses).color}`}>
+                  {formatPercentageChangeExpenses(summary.expenses, previousPeriodSummary.expenses).text}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-500">vs período anterior</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Profit Card */}
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-8 shadow-sm dark:shadow-none">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-base font-semibold text-gray-600 dark:text-gray-400">Lucro Líquido</span>
             <div className="flex items-center gap-2">
               <button
+                onClick={fetchProfitDetails}
+                className={`p-2 rounded-lg transition-colors ${
+                  summary.profit >= 0
+                    ? 'hover:bg-green-50 dark:hover:bg-green-500/10'
+                    : 'hover:bg-red-50 dark:hover:bg-red-500/10'
+                }`}
+                title="Ver detalhamento"
+              >
+                <List className={`w-5 h-5 ${
+                  summary.profit >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`} />
+              </button>
+              <div className={`p-3 rounded-xl ${
+                summary.profit >= 0 
+                  ? 'bg-green-100 dark:bg-green-500/10' 
+                  : 'bg-red-100 dark:bg-red-500/10'
+              }`}>
+                <TrendingUp className={`w-6 h-6 ${
+                  summary.profit >= 0 
+                    ? 'text-green-600 dark:text-green-400' 
+                    : 'text-red-600 dark:text-red-400'
+                }`} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <p className={`text-3xl font-bold mb-2 ${
+              summary.profit >= 0 
+                ? 'text-green-600 dark:text-green-400' 
+                : 'text-red-600 dark:text-red-400'
+            }`}>
+              {formatCurrency(summary.profit)}
+            </p>
+            {selectedPeriod !== 'custom' && (
+              <div className="flex items-center gap-1">
+                <span className={`text-sm font-semibold ${formatPercentageChange(summary.profit, previousPeriodSummary.profit).color}`}>
+                  {formatPercentageChange(summary.profit, previousPeriodSummary.profit).text}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-500">vs período anterior</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Cards - Camada Secundária (Menores e Compactos) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Cash Balance Card */}
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-xl p-5 shadow-sm dark:shadow-none">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Saldo em Espécie</span>
+            <div className="flex items-center gap-1">
+              <button
                 onClick={fetchCashDetails}
-                className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-colors"
                 title="Ver detalhamento"
               >
                 <List className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -1026,18 +1260,14 @@ export default function FinanceiroPage() {
               </div>
             </div>
           </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(cashBalance)}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Dinheiro Vivo</p>
-            </div>
-          </div>
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+            {formatCurrency(cashBalance)}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Dinheiro Vivo</p>
         </div>
 
-        {/* House Profit Card (NEW) */}
-        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
+        {/* House Profit Card */}
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-xl p-5 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Lucro Comissões</span>
             <div className="p-2 bg-indigo-100 dark:bg-indigo-500/10 rounded-lg">
@@ -1046,94 +1276,24 @@ export default function FinanceiroPage() {
               </svg>
             </div>
           </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                {formatCurrency(summary.houseProfit)}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Sobra da Casa</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Profit Card */}
-        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Lucro Líquido</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={fetchProfitDetails}
-                className={`p-2 rounded-lg transition-colors ${
-                  summary.profit >= 0
-                    ? 'hover:bg-green-50 dark:hover:bg-green-500/10'
-                    : 'hover:bg-red-50 dark:hover:bg-red-500/10'
-                }`}
-                title="Ver detalhamento"
-              >
-                <List className={`w-4 h-4 ${
-                  summary.profit >= 0
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
-                }`} />
-              </button>
-              <div className={`p-2 rounded-lg ${
-                summary.profit >= 0 
-                  ? 'bg-green-100 dark:bg-green-500/10' 
-                  : 'bg-red-100 dark:bg-red-500/10'
-              }`}>
-                <TrendingUp className={`w-4 h-4 ${
-                  summary.profit >= 0 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : 'text-red-600 dark:text-red-400'
-                }`} />
-              </div>
-            </div>
-          </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className={`text-2xl font-bold ${
-                summary.profit >= 0 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : 'text-red-600 dark:text-red-400'
-              }`}>
-                {formatCurrency(summary.profit)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Expenses Card */}
-        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Despesas</span>
-            <div className="p-2 bg-red-100 dark:bg-red-500/10 rounded-lg">
-              <TrendingDown className="w-4 h-4 text-red-600 dark:text-red-400" />
-            </div>
-          </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {formatCurrency(summary.expenses)}
-              </p>
-            </div>
-          </div>
+          <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+            {formatCurrency(summary.houseProfit)}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Sobra da Casa</p>
         </div>
 
         {/* Avg Ticket Card */}
-        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-xl p-5 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Ticket Médio</span>
             <div className="p-2 bg-purple-100 dark:bg-purple-500/10 rounded-lg">
               <DollarSign className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(summary.avgTicket)}
-              </p>
-            </div>
-          </div>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">
+            {formatCurrency(summary.avgTicket)}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Por atendimento</p>
         </div>
       </div>
 
@@ -1223,14 +1383,18 @@ export default function FinanceiroPage() {
             </ResponsiveContainer>
           ) : (
             <div className="h-[280px] flex items-center justify-center text-gray-400 dark:text-gray-600">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+              <div className="text-center px-6">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-500/10 to-emerald-500/10 flex items-center justify-center">
+                  <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                   </svg>
                 </div>
-                <p className="text-sm font-medium">Sem dados para exibir</p>
-                <p className="text-xs text-gray-500 mt-1">Adicione transações para ver o gráfico</p>
+                <p className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Você está começando! 🚀
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500">
+                  Continue registrando para ver sua evolução
+                </p>
               </div>
             </div>
           )}
@@ -1239,7 +1403,7 @@ export default function FinanceiroPage() {
         {/* Donut Chart - Expenses (Moderno) */}
         <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl p-6 shadow-sm dark:shadow-none">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Despesas</h3>
-          {expensesByCategory.length > 0 ? (
+          {expensesByCategory.length >= 3 ? (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
@@ -1285,16 +1449,57 @@ export default function FinanceiroPage() {
                 />
               </PieChart>
             </ResponsiveContainer>
+          ) : expensesByCategory.length > 0 ? (
+            <div className="h-[280px] flex flex-col justify-center">
+              <div className="space-y-3">
+                {expensesByCategory.map((expense, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/30 rounded-xl border border-gray-200 dark:border-gray-800"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {expense.name}
+                      </span>
+                    </div>
+                    <span className="text-base font-bold text-gray-900 dark:text-white">
+                      {formatCurrency(expense.value)}
+                    </span>
+                  </div>
+                ))}
+                <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total</span>
+                    <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                      {formatCurrency(expensesByCategory.reduce((sum, e) => sum + e.value, 0))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="h-[280px] flex items-center justify-center text-gray-400 dark:text-gray-600">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
-                  </svg>
+              <div className="text-center px-4">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-500/10 dark:to-emerald-500/10 flex items-center justify-center">
+                  <span className="text-2xl">🎉</span>
                 </div>
-                <p className="text-sm">Sem despesas</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Nenhuma despesa registrada este mês
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                  Mantenha suas contas organizadas
+                </p>
+                <button
+                  onClick={() => openModal('expense')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Despesa
+                </button>
               </div>
             </div>
           )}
