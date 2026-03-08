@@ -236,9 +236,9 @@ export default function ServicosPage() {
     ? groupedServices 
     : { [selectedBarberFilter]: groupedServices[selectedBarberFilter] }
 
-  // Opções de duração (em minutos) - até 3 horas
+  // Opções de duração (em minutos) - de 10 min até 3 horas
   const durationOptions = [
-    20, 25, 30, 35, 40, 45, 50, 55, 60, // até 1h
+    10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, // até 1h
     90, 120, 150, 180 // 1h30, 2h, 2h30, 3h
   ]
 
