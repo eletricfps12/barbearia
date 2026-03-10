@@ -21,10 +21,11 @@ export default function BarbershopPublicPage() {
   const [barbers, setBarbers] = useState([])
   const [allServices, setAllServices] = useState([])
   const [socialLinks, setSocialLinks] = useState(null)
+  const [allowMultipleServices, setAllowMultipleServices] = useState(false) // Nova configuração
   
   // Selection states
   const [selectedBarber, setSelectedBarber] = useState(null)
-  const [selectedService, setSelectedService] = useState(null)
+  const [selectedServices, setSelectedServices] = useState([]) // Mudado para array
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [businessHours, setBusinessHours] = useState(null)
@@ -51,13 +52,13 @@ export default function BarbershopPublicPage() {
 
   // Fetch available slots when dependencies change
   useEffect(() => {
-    if (selectedBarber && selectedService && selectedDate) {
+    if (selectedBarber && selectedServices.length > 0 && selectedDate) {
       fetchAvailableSlots()
     } else {
       setAvailableSlots([])
       setSelectedSlot(null)
     }
-  }, [selectedBarber, selectedService, selectedDate])
+  }, [selectedBarber, selectedServices, selectedDate])
 
   // Body scroll lock (Compatível com iOS)
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function BarbershopPublicPage() {
       // 1. Fetch barbershop by slug
       const { data: barbershopData, error: barbershopError } = await supabase
         .from('barbershops')
-        .select('id, name, logo_url, banner_url, contact_phone, address, instagram_url, facebook_url, whatsapp_number')
+        .select('id, name, logo_url, banner_url, contact_phone, address, instagram_url, facebook_url, whatsapp_number, allow_multiple_services')
         .eq('slug', slug)
         .single()
 
@@ -98,6 +99,9 @@ export default function BarbershopPublicPage() {
       }
 
       setBarbershop(barbershopData)
+      setAllowMultipleServices(barbershopData.allow_multiple_services || false) // Carregar configuração
+      
+      console.log('🔧 Configuração de múltiplos serviços:', barbershopData.allow_multiple_services)
       
       // Set social links
       setSocialLinks({
@@ -139,7 +143,7 @@ export default function BarbershopPublicPage() {
    * Fetch available time slots
    */
   const fetchAvailableSlots = async () => {
-    if (!selectedDate || !selectedService || !selectedBarber) {
+    if (!selectedDate || selectedServices.length === 0 || !selectedBarber) {
       setAvailableSlots([])
       return
     }
@@ -209,10 +213,14 @@ export default function BarbershopPublicPage() {
       const openTime = businessHours.open_time.substring(0, 5) // "09:00:00" -> "09:00"
       const closeTime = businessHours.close_time.substring(0, 5) // "18:00:00" -> "18:00"
 
+      // Calcular duração total dos serviços selecionados
+      const totalDuration = getTotalDuration()
+
       console.log('Gerando slots com horários do banco:', {
         dayOfWeek,
         openTime,
         closeTime,
+        totalDuration,
         isClosed: businessHours.is_closed,
         selectedDate: selectedDate.toLocaleDateString('pt-BR'),
         selectedDateObj: selectedDate
@@ -235,7 +243,7 @@ export default function BarbershopPublicPage() {
       
       const slots = generateAvailableSlots(
         dateStr,
-        selectedService.duration_minutes,
+        totalDuration, // Usa duração total dos serviços
         transformedAppointments,
         openTime,
         closeTime
@@ -256,16 +264,40 @@ export default function BarbershopPublicPage() {
    */
   const handleBarberSelect = (barber) => {
     setSelectedBarber(barber)
-    setSelectedService(null)
+    setSelectedServices([])
     setSelectedDate(null)
     setSelectedSlot(null)
   }
 
+  // Cálculos automáticos para múltiplos serviços
+  const getTotalDuration = () => {
+    return selectedServices.reduce((total, service) => total + (service.duration_minutes || 0), 0)
+  }
+
+  const getTotalPrice = () => {
+    return selectedServices.reduce((total, service) => total + (service.price || 0), 0)
+  }
+
   /**
-   * Handle service selection
+   * Handle service selection (múltipla ou única dependendo da configuração)
    */
   const handleServiceSelect = (service) => {
-    setSelectedService(service)
+    if (allowMultipleServices) {
+      // Modo múltiplo: toggle serviços
+      setSelectedServices(prev => {
+        const isSelected = prev.find(s => s.id === service.id)
+        if (isSelected) {
+          // Remove se já está selecionado
+          return prev.filter(s => s.id !== service.id)
+        } else {
+          // Adiciona se não está selecionado
+          return [...prev, service]
+        }
+      })
+    } else {
+      // Modo único: substitui o serviço selecionado
+      setSelectedServices([service])
+    }
     setSelectedDate(null)
     setSelectedSlot(null)
   }
@@ -351,8 +383,12 @@ export default function BarbershopPublicPage() {
       const startTime = new Date(selectedDate)
       startTime.setHours(hours, minutes, 0, 0)
 
+      // Calcular tempo e valor total
+      const totalDuration = getTotalDuration()
+      const totalPrice = getTotalPrice()
+
       const endTime = new Date(startTime)
-      endTime.setMinutes(endTime.getMinutes() + selectedService.duration_minutes)
+      endTime.setMinutes(endTime.getMinutes() + totalDuration)
 
       // Check availability
       const { data: existingAppointments } = await supabase
@@ -370,13 +406,21 @@ export default function BarbershopPublicPage() {
         return
       }
 
+      // Criar string com nomes dos serviços separados por " + "
+      const servicesNames = selectedServices.map(s => s.name).join(' + ')
+      
+      console.log('📝 Criando agendamento com serviços:', servicesNames)
+      console.log('💰 Valor total:', totalPrice)
+
       // Create appointment
       const { error: createError } = await supabase
         .from('appointments')
         .insert({
           barbershop_id: barbershop.id,
           barber_id: selectedBarber.id,
-          service_id: selectedService.id,
+          service_id: selectedServices[0].id, // Primeiro serviço como referência
+          service_name: servicesNames, // Todos os serviços concatenados
+          price: totalPrice, // Valor total
           client_name: clientName.trim(),
           client_phone: phoneNumbers, // Save only numbers
           client_email: clientEmail.trim(),
@@ -390,10 +434,12 @@ export default function BarbershopPublicPage() {
       // Success! Save booking data for thank you page
       setConfirmedBooking({
         barber: selectedBarber,
-        service: selectedService,
+        services: selectedServices, // Mudado para array
         date: selectedDate,
         time: selectedSlot.time,
-        clientName: clientName.trim()
+        clientName: clientName.trim(),
+        totalDuration,
+        totalPrice
       })
       
       setIsSubmitting(false)
@@ -416,7 +462,7 @@ export default function BarbershopPublicPage() {
     
     return (
       selectedBarber &&
-      selectedService &&
+      selectedServices.length > 0 &&
       selectedDate &&
       selectedSlot &&
       clientName.trim().length >= 3 &&
@@ -461,7 +507,7 @@ export default function BarbershopPublicPage() {
   const handleNewBooking = () => {
     setConfirmedBooking(null)
     setSelectedBarber(null)
-    setSelectedService(null)
+    setSelectedServices([])
     setSelectedDate(null)
     setSelectedSlot(null)
     setClientName('')
@@ -559,10 +605,22 @@ export default function BarbershopPublicPage() {
             </div>
           </div>
 
-          {/* Service */}
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400">Serviço:</span>
-            <span className="text-white font-semibold">{confirmedBooking.service.name}</span>
+          {/* Services */}
+          <div className="flex justify-between items-start">
+            <span className="text-gray-400">
+              {confirmedBooking.services.length > 1 ? 'Serviços:' : 'Serviço:'}
+            </span>
+            <div className="text-right">
+              {confirmedBooking.services.length > 1 ? (
+                confirmedBooking.services.map((service, index) => (
+                  <div key={service.id} className="text-white font-semibold">
+                    {service.name}
+                  </div>
+                ))
+              ) : (
+                <span className="text-white font-semibold">{confirmedBooking.services[0]?.name}</span>
+              )}
+            </div>
           </div>
 
           {/* Date */}
@@ -583,13 +641,21 @@ export default function BarbershopPublicPage() {
             <span className="text-white font-semibold">{confirmedBooking.time}</span>
           </div>
 
+          {/* Duration - apenas se múltiplos serviços */}
+          {confirmedBooking.services.length > 1 && (
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Duração Total:</span>
+              <span className="text-white font-semibold">{confirmedBooking.totalDuration} min</span>
+            </div>
+          )}
+
           {/* Divider */}
           <div className="border-t border-[#2A2A2A] pt-4">
             {/* Total */}
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-lg">Valor Total:</span>
               <span className="text-white font-bold text-2xl">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(confirmedBooking.service.price)}
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(confirmedBooking.totalPrice)}
               </span>
             </div>
           </div>
@@ -772,53 +838,103 @@ export default function BarbershopPublicPage() {
           </div>
         </div>
 
-        {/* Step 2: Choose Service */}
+        {/* Step 2: Choose Services (múltipla ou única seleção) */}
         {selectedBarber && (
           <div>
-            <h2 className="text-xl font-bold text-white mb-4">Escolha o Serviço</h2>
+            <h2 className="text-xl font-bold text-white mb-4">
+              {allowMultipleServices ? 'Escolha os serviços' : 'Escolha o serviço'}
+            </h2>
             {filteredServices.length === 0 ? (
               <p className="text-gray-400 text-center py-8">Nenhum serviço disponível para este profissional</p>
             ) : (
               <div className="space-y-3">
-                {filteredServices.map((service) => (
-                  <button
-                    key={service.id}
-                    type="button"
-                    onClick={() => handleServiceSelect(service)}
-                    className={`w-full p-4 rounded-xl transition-all ${
-                      selectedService?.id === service.id
-                        ? 'bg-white text-black'
-                        : 'bg-[#1A1A1A] text-white border border-[#2A2A2A]'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="text-left">
-                        <h3 className={`font-semibold ${
-                          selectedService?.id === service.id ? 'text-black' : 'text-white'
-                        }`}>
-                          {service.name}
-                        </h3>
-                        <p className={`text-sm ${
-                          selectedService?.id === service.id ? 'text-gray-700' : 'text-gray-400'
-                        }`}>
-                          {service.duration_minutes} min
-                        </p>
+                {filteredServices.map((service) => {
+                  const isSelected = selectedServices.some(s => s.id === service.id)
+                  return (
+                    <button
+                      key={service.id}
+                      type="button"
+                      onClick={() => handleServiceSelect(service)}
+                      className={`w-full p-4 rounded-xl transition-all ${
+                        isSelected
+                          ? 'bg-white text-black'
+                          : 'bg-[#1A1A1A] text-white border border-[#2A2A2A]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Checkbox - apenas se múltiplos serviços estiver ativado */}
+                        {allowMultipleServices && (
+                          <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                            isSelected 
+                              ? 'bg-black border-black' 
+                              : 'border-gray-500'
+                          }`}>
+                            {isSelected && (
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Service Info */}
+                        <div className="flex justify-between items-center flex-1">
+                          <div className="text-left">
+                            <h3 className={`font-semibold ${
+                              isSelected ? 'text-black' : 'text-white'
+                            }`}>
+                              {service.name}
+                            </h3>
+                            <p className={`text-sm ${
+                              isSelected ? 'text-gray-700' : 'text-gray-400'
+                            }`}>
+                              {service.duration_minutes} min
+                            </p>
+                          </div>
+                          <div className={`text-lg font-bold ${
+                            isSelected ? 'text-black' : 'text-white'
+                          }`}>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price)}
+                          </div>
+                        </div>
                       </div>
-                      <div className={`text-lg font-bold ${
-                        selectedService?.id === service.id ? 'text-black' : 'text-white'
-                      }`}>
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price)}
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
         )}
 
+        {/* Resumo dos Serviços Selecionados - apenas se múltiplos serviços estiver ativado */}
+        {allowMultipleServices && selectedServices.length > 0 && (
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <h4 className="font-semibold text-white mb-3">
+              Resumo da Seleção
+            </h4>
+            <div className="space-y-2">
+              {selectedServices.map((service, index) => (
+                <div key={service.id} className="flex justify-between text-sm">
+                  <span className="text-gray-300">
+                    {index + 1}. {service.name}
+                  </span>
+                  <span className="text-gray-400">
+                    {service.duration_minutes}min • R$ {service.price.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+              <div className="border-t border-white/10 pt-2 mt-2">
+                <div className="flex justify-between font-bold text-white">
+                  <span>Total</span>
+                  <span>{getTotalDuration()}min • R$ {getTotalPrice().toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Step 3: Choose Date */}
-        {selectedService && (
+        {selectedServices.length > 0 && (
           <div>
             <h2 className="text-xl font-bold text-white mb-4">Escolha a Data</h2>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -958,9 +1074,21 @@ export default function BarbershopPublicPage() {
             {/* Summary */}
             <div className="mb-6">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Serviço:</span>
-                  <span className="font-semibold text-black">{selectedService.name}</span>
+                <div className="flex justify-between items-start">
+                  <span className="text-gray-600">
+                    {allowMultipleServices && selectedServices.length > 1 ? 'Serviços:' : 'Serviço:'}
+                  </span>
+                  <div className="text-right">
+                    {allowMultipleServices && selectedServices.length > 1 ? (
+                      selectedServices.map((service, index) => (
+                        <div key={service.id} className="font-semibold text-black">
+                          {service.name}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="font-semibold text-black">{selectedServices[0]?.name}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data:</span>
@@ -972,10 +1100,16 @@ export default function BarbershopPublicPage() {
                   <span className="text-gray-600">Horário:</span>
                   <span className="font-semibold text-black">{selectedSlot.time}</span>
                 </div>
+                {allowMultipleServices && selectedServices.length > 1 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Duração Total:</span>
+                    <span className="font-semibold text-black">{getTotalDuration()} min</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 border-t border-gray-200">
                   <span className="text-gray-600">Total:</span>
                   <span className="text-lg font-bold text-black">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedService.price)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getTotalPrice())}
                   </span>
                 </div>
               </div>

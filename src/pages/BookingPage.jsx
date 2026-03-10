@@ -22,7 +22,7 @@ export default function BookingPage() {
   // State management
   const [barber, setBarber] = useState(null)
   const [services, setServices] = useState([])
-  const [selectedService, setSelectedService] = useState(null)
+  const [selectedServices, setSelectedServices] = useState([]) // Mudado para array
   const [selectedDate, setSelectedDate] = useState(null)
   const [availableSlots, setAvailableSlots] = useState([])
   const [selectedSlot, setSelectedSlot] = useState(null)
@@ -157,7 +157,7 @@ export default function BookingPage() {
         const hours = await fetchBusinessHours()
         
         // Passa esse valor diretamente para a busca de slots
-        if (selectedService && hours) {
+        if (selectedServices.length > 0 && hours) {
           await fetchAvailableSlots(hours)
         }
       } else {
@@ -168,7 +168,7 @@ export default function BookingPage() {
     }
     
     loadData()
-  }, [selectedDate, selectedService, barberId, barber?.barbershop_id])
+  }, [selectedDate, selectedServices, barberId, barber?.barbershop_id])
 
   // Function to fetch business hours for selected date
   const fetchBusinessHours = async () => {
@@ -219,7 +219,7 @@ export default function BookingPage() {
     // Se o parâmetro não veio, tenta usar o estado (fallback)
     const hoursToUse = currentHours || businessHours
     
-    if (!selectedDate || !selectedService) {
+    if (!selectedDate || selectedServices.length === 0) {
       setAvailableSlots([])
       setIsLoadingSlots(false)
       return
@@ -235,6 +235,9 @@ export default function BookingPage() {
 
     try {
       setIsLoadingSlots(true)
+      
+      // Calcular duração total dos serviços selecionados
+      const totalDuration = getTotalDuration()
       
       // Format date range for the selected day
       const startOfDay = new Date(selectedDate)
@@ -285,6 +288,7 @@ export default function BookingPage() {
       console.log('Gerando slots com horários:', {
         openTime,
         closeTime,
+        totalDuration,
         hoursToUse,
         isClosed: hoursToUse?.is_closed
       })
@@ -292,7 +296,7 @@ export default function BookingPage() {
       const dateStr = selectedDate.toISOString().split('T')[0]
       const slots = generateAvailableSlots(
         dateStr,
-        selectedService.duration,
+        totalDuration, // Usa duração total dos serviços
         transformedAppointments,
         openTime,
         closeTime
@@ -310,10 +314,33 @@ export default function BookingPage() {
     }
   }
 
-  // Handle service selection
+  // Cálculos automáticos para múltiplos serviços
+  const getTotalDuration = () => {
+    return selectedServices.reduce((total, service) => total + (service.duration || 0), 0)
+  }
+
+  const getTotalPrice = () => {
+    return selectedServices.reduce((total, service) => total + (service.price || 0), 0)
+  }
+
+  // Handle service selection (múltipla)
   const handleServiceSelect = (service) => {
-    setSelectedService(service)
-    setSelectedSlot(null) // Reset slot when service changes
+    console.log('Selecionando serviço:', service.name)
+    console.log('Serviços antes:', selectedServices.map(s => s.name))
+    
+    setSelectedServices(prev => {
+      const isSelected = prev.find(s => s.id === service.id)
+      if (isSelected) {
+        // Remove se já está selecionado
+        console.log('Removendo serviço:', service.name)
+        return prev.filter(s => s.id !== service.id)
+      } else {
+        // Adiciona se não está selecionado
+        console.log('Adicionando serviço:', service.name)
+        return [...prev, service]
+      }
+    })
+    setSelectedSlot(null) // Reset slot when services change
   }
 
   // Handle date selection
@@ -330,7 +357,7 @@ export default function BookingPage() {
   // Check if form can be submitted
   const canSubmit = () => {
     return (
-      selectedService &&
+      selectedServices.length > 0 &&
       selectedDate &&
       selectedSlot &&
       clientName.trim().length >= 3 &&
@@ -362,9 +389,13 @@ export default function BookingPage() {
       const startTime = new Date(selectedDate)
       startTime.setHours(hours, minutes, 0, 0)
 
+      // Calcular tempo e valor total
+      const totalDuration = getTotalDuration()
+      const totalPrice = getTotalPrice()
+
       // Create end_time timestamp
       const endTime = new Date(startTime)
-      endTime.setMinutes(endTime.getMinutes() + selectedService.duration)
+      endTime.setMinutes(endTime.getMinutes() + totalDuration)
 
       // Check if slot is still available (prevent race conditions)
       const { data: existingAppointments } = await supabase
@@ -382,18 +413,24 @@ export default function BookingPage() {
         return
       }
 
+      // Criar string com nomes dos serviços separados por " + "
+      const servicesNames = selectedServices.map(s => s.name).join(' + ')
+
       // Create appointment with client name and phone
+      // Salva o primeiro serviço no service_id e todos os nomes no service_name
       const { data, error: createError } = await supabase
         .from('appointments')
         .insert({
           barbershop_id: barber.barbershop_id,
           barber_id: barberId,
-          service_id: selectedService.id,
+          service_id: selectedServices[0].id, // Primeiro serviço como referência
+          service_name: servicesNames, // Todos os serviços concatenados
           client_name: clientName.trim(),
           client_phone: clientPhone.trim(),
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'confirmed'
+          status: 'confirmed',
+          price: totalPrice // Salva o preço total
         })
         .select()
         .single()
@@ -414,7 +451,7 @@ export default function BookingPage() {
 
       // Reset form after success
       setTimeout(() => {
-        setSelectedService(null)
+        setSelectedServices([])
         setSelectedDate(null)
         setSelectedSlot(null)
         setClientName('')
@@ -508,7 +545,7 @@ export default function BookingPage() {
 
         {/* Services Section */}
         <div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Escolha o serviço</h3>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Escolha os serviços</h3>
           {services.length === 0 ? (
             <p className="text-gray-900 dark:text-white text-center py-8">Nenhum serviço disponível</p>
           ) : (
@@ -517,7 +554,7 @@ export default function BookingPage() {
                 <ServiceCard
                   key={service.id}
                   service={service}
-                  isSelected={selectedService?.id === service.id}
+                  isSelected={selectedServices.some(s => s.id === service.id)}
                   onSelect={handleServiceSelect}
                 />
               ))}
@@ -525,8 +562,35 @@ export default function BookingPage() {
           )}
         </div>
 
+        {/* Resumo dos Serviços Selecionados */}
+        {selectedServices.length > 0 && (
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
+            <h4 className="font-semibold text-indigo-900 dark:text-indigo-100 mb-3">
+              Resumo da Seleção
+            </h4>
+            <div className="space-y-2">
+              {selectedServices.map((service, index) => (
+                <div key={service.id} className="flex justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {index + 1}. {service.name}
+                  </span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {service.duration}min • R$ {service.price.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+              <div className="border-t border-indigo-200 dark:border-indigo-700 pt-2 mt-2">
+                <div className="flex justify-between font-bold text-indigo-900 dark:text-indigo-100">
+                  <span>Total</span>
+                  <span>{getTotalDuration()}min • R$ {getTotalPrice().toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Calendar Section */}
-        {selectedService && (
+        {selectedServices.length > 0 && (
           <div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Escolha a data</h3>
             <HorizontalCalendar
@@ -538,7 +602,7 @@ export default function BookingPage() {
         )}
 
         {/* Time Slots Section */}
-        {selectedService && selectedDate && (
+        {selectedServices.length > 0 && selectedDate && (
           <div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Escolha o horário</h3>
             
@@ -602,14 +666,16 @@ export default function BookingPage() {
         )}
 
         {/* Booking Form */}
-        {selectedService && selectedDate && selectedSlot && (
+        {selectedServices.length > 0 && selectedDate && selectedSlot && (
           <div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Confirmar agendamento</h3>
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-900 dark:text-white">
-                  <span>Serviço:</span>
-                  <span className="font-semibold">{selectedService.name}</span>
+                  <span>Serviços:</span>
+                  <span className="font-semibold text-right">
+                    {selectedServices.map(s => s.name).join(' + ')}
+                  </span>
                 </div>
                 <div className="flex justify-between text-gray-900 dark:text-white">
                   <span>Data:</span>
@@ -622,13 +688,13 @@ export default function BookingPage() {
                   <span className="font-semibold">{selectedSlot.time}</span>
                 </div>
                 <div className="flex justify-between text-gray-900 dark:text-white">
-                  <span>Duração:</span>
-                  <span className="font-semibold">{selectedService.duration} min</span>
+                  <span>Duração Total:</span>
+                  <span className="font-semibold">{getTotalDuration()} min</span>
                 </div>
                 <div className="flex justify-between text-gray-900 dark:text-white text-lg pt-4 border-t border-gray-200 dark:border-gray-700">
                   <span>Total:</span>
                   <span className="font-bold">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedService.price)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getTotalPrice())}
                   </span>
                 </div>
               </div>

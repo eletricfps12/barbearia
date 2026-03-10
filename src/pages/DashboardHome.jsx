@@ -62,7 +62,7 @@ export default function DashboardHome() {
       // 3. Buscar agendamentos do dia selecionado
       const { data: appointmentsData } = await supabase
         .from('appointments')
-        .select('*, services(name, price), barbers(name, commission_percentage)')
+        .select('*, barbers(name, commission_percentage)')
         .eq('barbershop_id', shopId)
         .gte('start_time', startOfDay.toISOString())
         .lte('start_time', endOfDay.toISOString())
@@ -75,12 +75,12 @@ export default function DashboardHome() {
         (apt.status === 'confirmed' || apt.status === 'completed') && !apt.is_subscriber
       ) || []
 
-      // 4. Calcular receita e lucro
+      // 4. Calcular receita e lucro usando o campo price do agendamento
       let totalRevenue = 0
       let totalCommissions = 0
 
       confirmedAppointments.forEach(apt => {
-        const price = apt.services?.price || 0
+        const price = apt.price || 0 // Usar price do agendamento
         const commission = apt.barbers?.commission_percentage || 50
         totalRevenue += price
         totalCommissions += (price * commission) / 100
@@ -137,7 +137,7 @@ export default function DashboardHome() {
       const now = selectedDate.toISOString()
       const { data: nextApt } = await supabase
         .from('appointments')
-        .select('*, services(name), barbers(name)')
+        .select('*, barbers(name)')
         .eq('barbershop_id', shopId)
         .gte('start_time', now)
         .eq('status', 'confirmed')
@@ -664,7 +664,7 @@ export default function DashboardHome() {
                     {dashboardData.nextAppointment.client_name}
                   </h3>
                   <p style={{ color: 'var(--text-secondary)' }} className="text-sm">
-                    {dashboardData.nextAppointment.services?.name} • {dashboardData.nextAppointment.barbers?.name}
+                    {dashboardData.nextAppointment.service_name || dashboardData.nextAppointment.services?.name} • {dashboardData.nextAppointment.barbers?.name}
                   </p>
                 </div>
                 <div className="text-right">

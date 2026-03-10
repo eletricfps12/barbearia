@@ -82,7 +82,8 @@ export default function ConfiguracoesPage() {
     instagram_url: '',
     facebook_url: '',
     whatsapp_number: '',
-    brand_color: '#3b82f6'
+    brand_color: '#3b82f6',
+    allow_multiple_services: false
   })
 
   // CEP loading state
@@ -203,7 +204,8 @@ export default function ConfiguracoesPage() {
           instagram_url: barbershopData.instagram_url || '',
           facebook_url: barbershopData.facebook_url || '',
           whatsapp_number: barbershopData.whatsapp_number || '',
-          brand_color: barbershopData.brand_color || '#3b82f6'
+          brand_color: barbershopData.brand_color || '#3b82f6',
+          allow_multiple_services: barbershopData.allow_multiple_services || false
         })
       }
     } catch (err) {
@@ -470,7 +472,8 @@ export default function ConfiguracoesPage() {
           instagram_url: formData.instagram_url,
           facebook_url: formData.facebook_url,
           whatsapp_number: formData.whatsapp_number,
-          brand_color: formData.brand_color
+          brand_color: formData.brand_color,
+          allow_multiple_services: formData.allow_multiple_services
         })
         .eq('id', barbershopId)
 
@@ -984,6 +987,41 @@ export default function ConfiguracoesPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-500 italic">
                     Use o endereço completo acima para localização
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Preferências de Agendamento */}
+            <div className="lg:col-span-6 bg-white/5 dark:bg-white/5 backdrop-blur-xl border border-white/10 dark:border-white/10 rounded-[2.5rem] p-6 shadow-lg">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
+                Preferências de Agendamento
+              </h2>
+
+              <div className="space-y-4">
+                {/* Multiple Services Toggle */}
+                <div className="flex items-start justify-between gap-4 p-4 bg-gray-100 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex-1">
+                    <label htmlFor="allow_multiple_services" className="block text-sm font-semibold text-gray-900 dark:text-white mb-1 cursor-pointer">
+                      Permitir múltiplos serviços por agendamento
+                    </label>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Quando ativado, seus clientes poderão selecionar mais de um serviço por vez. O tempo e valor serão somados automaticamente.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    id="allow_multiple_services"
+                    onClick={() => setFormData(prev => ({ ...prev, allow_multiple_services: !prev.allow_multiple_services }))}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      formData.allow_multiple_services ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        formData.allow_multiple_services ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>
