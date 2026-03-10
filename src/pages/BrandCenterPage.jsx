@@ -66,6 +66,7 @@ export default function ConfiguracoesPage() {
   // Form data
   const [formData, setFormData] = useState({
     name: '',
+    slug: '',
     contact_phone: '',
     contact_email: '',
     address: '',
@@ -186,6 +187,7 @@ export default function ConfiguracoesPage() {
         
         setFormData({
           name: barbershopData.name || '',
+          slug: barbershopData.slug || '',
           contact_phone: barbershopData.contact_phone || '',
           contact_email: barbershopData.contact_email || '',
           address: barbershopData.address || '',
@@ -440,11 +442,26 @@ export default function ConfiguracoesPage() {
         bannerUrl = await uploadImage(bannerFile, 'banners')
       }
 
+      // Gerar slug a partir do nome da barbearia
+      const generateSlug = (name) => {
+        return name
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+          .replace(/[^\w\s-]/g, '') // Remove caracteres especiais
+          .replace(/\s+/g, '-') // Substitui espaços por hífens
+          .replace(/-+/g, '-') // Remove hífens duplicados
+          .trim()
+      }
+
+      const newSlug = generateSlug(formData.name)
+
       // Update barbershop data
       const { error: updateError } = await supabase
         .from('barbershops')
         .update({
           name: formData.name,
+          slug: newSlug,
           contact_phone: formData.contact_phone,
           contact_email: formData.contact_email,
           address: formData.address,
@@ -459,9 +476,10 @@ export default function ConfiguracoesPage() {
 
       if (updateError) throw updateError
 
-      // Update form data with new URLs
+      // Update form data with new URLs and slug
       setFormData(prev => ({
         ...prev,
+        slug: newSlug,
         logo_url: logoUrl,
         banner_url: bannerUrl
       }))
@@ -493,8 +511,8 @@ export default function ConfiguracoesPage() {
 
   const copyBookingLink = async () => {
     try {
-      // Use the same format as "View as Client" button
-      const barbershopSlug = formData.name?.toLowerCase().replace(/\s+/g, '-') || 'barbearia'
+      // Use slug from database
+      const barbershopSlug = formData.slug || 'barbearia'
       const bookingUrl = `${window.location.origin}/${barbershopSlug}`
       
       await navigator.clipboard.writeText(bookingUrl)
@@ -540,7 +558,7 @@ export default function ConfiguracoesPage() {
           
           {/* Visualizar como Cliente Button */}
           <a
-            href={`/${formData.name?.toLowerCase().replace(/\s+/g, '-') || 'barbearia'}`}
+            href={`/${formData.slug || 'barbearia'}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all hover:scale-105 active:scale-95"
@@ -579,7 +597,7 @@ export default function ConfiguracoesPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
                   <p className="text-xs md:text-sm font-mono text-gray-700 dark:text-gray-300 truncate">
-                    {window.location.origin}/{formData.name?.toLowerCase().replace(/\s+/g, '-') || 'barbearia'}
+                    {window.location.origin}/{formData.slug || 'barbearia'}
                   </p>
                 </div>
                 <button

@@ -71,7 +71,7 @@ export default function BarberInfo({ barber }) {
             <img
               src={barber.avatar_url}
               alt={barber.name}
-              className="w-20 h-20 rounded-full object-cover"
+              className="w-20 h-20 rounded-full object-contain bg-gray-100 dark:bg-gray-700"
               onError={handleImageError}
             />
           ) : (

@@ -539,12 +539,12 @@ export default function BarbershopPublicPage() {
           {/* Barber with Photo */}
           <div className="flex items-center gap-4 pb-4 border-b border-[#2A2A2A]">
             {/* Barber Photo */}
-            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 flex-shrink-0">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 flex-shrink-0 bg-[#1A1A1A]">
               {confirmedBooking.barber.avatar_url ? (
                 <img 
                   src={confirmedBooking.barber.avatar_url} 
                   alt={confirmedBooking.barber.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold text-xl">
@@ -743,7 +743,7 @@ export default function BarbershopPublicPage() {
                   selectedBarber?.id === barber.id ? 'relative z-10' : ''
                 }`}
               >
-                <div className={`w-20 h-20 flex-shrink-0 aspect-square transition-all ${
+                <div className={`w-20 h-20 flex-shrink-0 aspect-square transition-all overflow-hidden ${
                   selectedBarber?.id === barber.id
                     ? 'rounded-full ring-2 ring-white ring-offset-2 ring-offset-[#0A0A0A] scale-105'
                     : 'rounded-full'
@@ -752,7 +752,7 @@ export default function BarbershopPublicPage() {
                     <img
                       src={barber.avatar_url}
                       alt={barber.name}
-                      className="w-full h-full rounded-full object-contain bg-[#1A1A1A]"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full rounded-full bg-[#1A1A1A] flex items-center justify-center">
@@ -935,12 +935,12 @@ export default function BarbershopPublicPage() {
             {/* Barber Photo Section */}
             <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
               {/* Barber Photo */}
-              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-200 flex-shrink-0">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-200 flex-shrink-0 bg-gray-100">
                 {selectedBarber.avatar_url ? (
                   <img 
                     src={selectedBarber.avatar_url} 
                     alt={selectedBarber.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-white font-bold text-xl">

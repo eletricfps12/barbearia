@@ -1,8 +1,58 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Pencil, Trash2, MoreVertical } from 'lucide-react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import Cropper from 'react-easy-crop'
+
+/**
+ * Utility function to create an image element from a URL
+ */
+const createImage = (url) =>
+  new Promise((resolve, reject) => {
+    const image = new Image()
+    image.addEventListener('load', () => resolve(image))
+    image.addEventListener('error', (error) => reject(error))
+    image.setAttribute('crossOrigin', 'anonymous')
+    image.src = url
+  })
+
+/**
+ * Utility function to get cropped image as Blob
+ */
+const getCroppedImg = async (imageSrc, pixelCrop) => {
+  const image = await createImage(imageSrc)
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+
+  if (!ctx) {
+    return null
+  }
+
+  // Set canvas size to match the crop area
+  canvas.width = pixelCrop.width
+  canvas.height = pixelCrop.height
+
+  // Draw the cropped image
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height
+  )
+
+  // Convert canvas to blob
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      resolve(blob)
+    }, 'image/jpeg', 0.95)
+  })
+}
 
 /**
  * EquipePage Component
@@ -20,6 +70,14 @@ export default function EquipePage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [activeMenu, setActiveMenu] = useState(null)
+  
+  // Crop modal states
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false)
+  const [imageToCrop, setImageToCrop] = useState(null)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
+  const [isCropping, setIsCropping] = useState(false)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -140,11 +198,83 @@ export default function EquipePage() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      setSelectedFile(file)
-      // Create preview URL
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor, selecione uma imagem válida')
+        return
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('A imagem deve ter no máximo 5MB')
+        return
+      }
+
+      // Open crop modal instead of direct preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImageToCrop(reader.result)
+        setIsCropModalOpen(true)
+        setCrop({ x: 0, y: 0 })
+        setZoom(1)
+      }
+      reader.readAsDataURL(file)
     }
+  }
+
+  /**
+   * Callback when crop area changes
+   */
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels)
+  }, [])
+
+  /**
+   * Confirm crop and set cropped image
+   */
+  const handleCropConfirm = async () => {
+    try {
+      setIsCropping(true)
+      
+      // Get cropped image as blob
+      const croppedBlob = await getCroppedImg(imageToCrop, croppedAreaPixels)
+      
+      if (!croppedBlob) {
+        toast.error('Erro ao processar imagem')
+        return
+      }
+
+      // Convert blob to File
+      const croppedFile = new File([croppedBlob], 'avatar.jpg', { type: 'image/jpeg' })
+      
+      // Set as selected file and preview
+      setSelectedFile(croppedFile)
+      
+      // Create preview URL from blob
+      const previewUrl = URL.createObjectURL(croppedBlob)
+      setPreviewUrl(previewUrl)
+      
+      // Close modal
+      setIsCropModalOpen(false)
+      setImageToCrop(null)
+      
+      toast.success('Imagem ajustada com sucesso!')
+    } catch (err) {
+      console.error('Erro ao cortar imagem:', err)
+      toast.error('Erro ao processar imagem cortada')
+    } finally {
+      setIsCropping(false)
+    }
+  }
+
+  /**
+   * Cancel crop
+   */
+  const handleCropCancel = () => {
+    setIsCropModalOpen(false)
+    setImageToCrop(null)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
   }
 
   /**
@@ -746,6 +876,84 @@ export default function EquipePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Crop Modal */}
+      {isCropModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                Ajustar Foto do Profissional
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Posicione e ajuste o zoom para enquadrar a foto perfeitamente
+              </p>
+            </div>
+
+            {/* Crop Area */}
+            <div className="relative h-96 bg-gray-900">
+              <Cropper
+                image={imageToCrop}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+
+            {/* Zoom Control */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Zoom
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={handleCropCancel}
+                disabled={isCropping}
+                className="px-6 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCropConfirm}
+                disabled={isCropping}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
+              >
+                {isCropping ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
