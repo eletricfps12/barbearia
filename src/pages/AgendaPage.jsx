@@ -23,6 +23,7 @@ export default function AgendaPage() {
   const [barbers, setBarbers] = useState([])
   const [barbershopId, setBarbershopId] = useState(null)
   const [businessHours, setBusinessHours] = useState(null)
+  const [timeBlocks, setTimeBlocks] = useState([]) // Bloqueios de horário
   
   // Capacity states
   const [occupationRate, setOccupationRate] = useState(0)
@@ -30,10 +31,32 @@ export default function AgendaPage() {
   const [fitSlots, setFitSlots] = useState([])
   const [showCapacityDetails, setShowCapacityDetails] = useState(false)
   
+  // View states
+  const [viewMode, setViewMode] = useState(() => {
+    // Carregar preferência salva ou usar 'list' como padrão
+    return localStorage.getItem('agendaViewMode') || 'list'
+  })
+  const [currentTime, setCurrentTime] = useState(new Date())
+  
   // UI states
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [updatingStatus, setUpdatingStatus] = useState(null)
+  
+  // Modal states
+  const [selectedAppointment, setSelectedAppointment] = useState(null)
+  const [selectedBlock, setSelectedBlock] = useState(null)
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false)
+  const [showBlockModal, setShowBlockModal] = useState(false)
+  
+  // Update current time every minute for "now" line
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60000) // Update every minute
+    
+    return () => clearInterval(interval)
+  }, [])
 
   // Fetch barbershop ID on mount
   useEffect(() => {
@@ -53,6 +76,7 @@ export default function AgendaPage() {
     if (barbershopId) {
       fetchAppointments()
       fetchBusinessHours()
+      fetchTimeBlocks() // Buscar bloqueios
     }
   }, [barbershopId, selectedDate, selectedBarber])
 
@@ -66,6 +90,11 @@ export default function AgendaPage() {
       setFitSlots([])
     }
   }, [appointments, businessHours])
+  
+  // Save view mode preference
+  useEffect(() => {
+    localStorage.setItem('agendaViewMode', viewMode)
+  }, [viewMode])
 
   // Setup Supabase Realtime subscription
   useEffect(() => {
@@ -166,6 +195,69 @@ export default function AgendaPage() {
   }
 
   /**
+   * Fetch time blocks (bloqueios) for the selected date
+   */
+  const fetchTimeBlocks = async () => {
+    try {
+      const startOfDay = new Date(selectedDate)
+      startOfDay.setHours(0, 0, 0, 0)
+      
+      const endOfDay = new Date(selectedDate)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      // Buscar bloqueios pontuais do dia
+      const { data: oneTimeBlocks, error: oneTimeError } = await supabase
+        .from('time_blocks')
+        .select('*')
+        .eq('barbershop_id', barbershopId)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString())
+
+      if (oneTimeError) throw oneTimeError
+
+      // Buscar bloqueios fixos (recorrentes)
+      const { data: fixedBlocks, error: fixedError } = await supabase
+        .from('fixed_time_blocks')
+        .select('*')
+        .eq('barbershop_id', barbershopId)
+
+      if (fixedError) throw fixedError
+
+      // Combinar bloqueios
+      const allBlocks = [
+        ...(oneTimeBlocks || []).map(block => ({
+          ...block,
+          type: 'one-time',
+          start_time: new Date(block.start_time),
+          end_time: new Date(block.end_time)
+        })),
+        ...(fixedBlocks || []).map(block => {
+          // Converter TIME para timestamp do dia selecionado
+          const [startHour, startMin] = block.start_time.split(':').map(Number)
+          const [endHour, endMin] = block.end_time.split(':').map(Number)
+          
+          const startTime = new Date(selectedDate)
+          startTime.setHours(startHour, startMin, 0, 0)
+          
+          const endTime = new Date(selectedDate)
+          endTime.setHours(endHour, endMin, 0, 0)
+          
+          return {
+            ...block,
+            type: 'fixed',
+            start_time: startTime,
+            end_time: endTime
+          }
+        })
+      ]
+
+      setTimeBlocks(allBlocks)
+    } catch (err) {
+      console.error('Error fetching time blocks:', err)
+    }
+  }
+
+  /**
    * Fetch appointments for selected date and barber
    */
   const fetchAppointments = async () => {
@@ -185,8 +277,7 @@ export default function AgendaPage() {
         .from('appointments')
         .select(`
           *,
-          barbers(name, color),
-          services(name, price, duration_minutes)
+          barbers(name, color)
         `)
         .eq('barbershop_id', barbershopId)
         .gte('start_time', startOfDay.toISOString())
@@ -231,7 +322,10 @@ export default function AgendaPage() {
     )
     
     const totalBookedMinutes = confirmedAppointments.reduce((sum, apt) => {
-      return sum + (apt.services?.duration_minutes || 0)
+      const startTime = new Date(apt.start_time)
+      const endTime = new Date(apt.end_time)
+      const durationMinutes = Math.round((endTime - startTime) / (1000 * 60))
+      return sum + durationMinutes
     }, 0)
 
     // Calculate occupation rate
@@ -388,6 +482,73 @@ export default function AgendaPage() {
   }
 
   /**
+   * Open appointment details modal
+   */
+  const openAppointmentModal = (appointment) => {
+    setSelectedAppointment(appointment)
+    setShowAppointmentModal(true)
+  }
+
+  /**
+   * Close appointment modal
+   */
+  const closeAppointmentModal = () => {
+    setShowAppointmentModal(false)
+    setTimeout(() => setSelectedAppointment(null), 300)
+  }
+
+  /**
+   * Open block details modal
+   */
+  const openBlockModal = (block) => {
+    setSelectedBlock(block)
+    setShowBlockModal(true)
+  }
+
+  /**
+   * Close block modal
+   */
+  const closeBlockModal = () => {
+    setShowBlockModal(false)
+    setTimeout(() => setSelectedBlock(null), 300)
+  }
+
+  /**
+   * Update appointment status from modal
+   */
+  const updateAppointmentStatusFromModal = async (appointmentId, newStatus) => {
+    await updateAppointmentStatus(appointmentId, newStatus)
+    closeAppointmentModal()
+  }
+
+  /**
+   * Remove time block
+   */
+  const removeTimeBlock = async (block) => {
+    try {
+      setUpdatingStatus(block.id)
+
+      const tableName = block.type === 'fixed' ? 'fixed_time_blocks' : 'time_blocks'
+      
+      const { error: deleteError } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id', block.id)
+
+      if (deleteError) throw deleteError
+
+      // Reload time blocks
+      await fetchTimeBlocks()
+      closeBlockModal()
+    } catch (err) {
+      console.error('Error removing time block:', err)
+      setError('Erro ao remover bloqueio')
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
+  /**
    * Navigate to previous day
    */
   const goToPreviousDay = () => {
@@ -503,6 +664,182 @@ export default function AgendaPage() {
     })
   }
 
+  /**
+   * Generate time slots for calendar view (07:00 to 22:00)
+   */
+  const generateTimeSlots = () => {
+    const slots = []
+    for (let hour = 7; hour <= 22; hour++) {
+      slots.push(`${String(hour).padStart(2, '0')}:00`)
+    }
+    return slots
+  }
+
+  /**
+   * Group appointments by time slot and organize in columns (no overlap)
+   */
+  const organizeAppointmentsInColumns = (slotTime) => {
+    const [slotHour] = slotTime.split(':').map(Number)
+    
+    // Get all appointments that overlap with this hour
+    const overlappingAppointments = appointments.filter(apt => {
+      const aptStart = new Date(apt.start_time)
+      const aptEnd = new Date(apt.end_time)
+      const aptStartHour = aptStart.getHours()
+      const aptEndHour = aptEnd.getHours()
+      const aptEndMinutes = aptEnd.getMinutes()
+      
+      // Check if appointment overlaps with this hour slot
+      return (aptStartHour <= slotHour && (aptEndHour > slotHour || (aptEndHour === slotHour && aptEndMinutes > 0)))
+    })
+    
+    // Group by barber to avoid overlap
+    const columns = []
+    overlappingAppointments.forEach(apt => {
+      // Find if there's already a column for this barber
+      let columnIndex = columns.findIndex(col => 
+        col.some(a => a.barber_id === apt.barber_id)
+      )
+      
+      if (columnIndex === -1) {
+        // Create new column
+        columns.push([apt])
+      } else {
+        // Add to existing column
+        columns[columnIndex].push(apt)
+      }
+    })
+    
+    return columns
+  }
+
+  /**
+   * Get time blocks for a specific time slot
+   */
+  const getBlocksForSlot = (slotTime) => {
+    const [slotHour] = slotTime.split(':').map(Number)
+    
+    return timeBlocks.filter(block => {
+      const blockHour = block.start_time.getHours()
+      const blockEndHour = block.end_time.getHours()
+      return blockHour <= slotHour && blockEndHour > slotHour
+    })
+  }
+
+  /**
+   * Calculate appointment position and height in calendar
+   * FIXED: Prevents card overlap by only showing card in slots it actually occupies
+   */
+  const getAppointmentStyle = (appointment, slotHour) => {
+    const startTime = new Date(appointment.start_time)
+    const endTime = new Date(appointment.end_time)
+    
+    const startHour = startTime.getHours()
+    const startMinutes = startTime.getMinutes()
+    const endHour = endTime.getHours()
+    const endMinutes = endTime.getMinutes()
+    
+    // Calculate top position relative to the slot
+    let top = 0
+    if (startHour === slotHour) {
+      top = (startMinutes / 60) * 100
+    }
+    
+    // Calculate height - ONLY for the portion in THIS slot
+    let height = 0
+    if (startHour === slotHour && endHour === slotHour) {
+      // Starts and ends in same hour
+      height = ((endMinutes - startMinutes) / 60) * 100
+    } else if (startHour === slotHour) {
+      // Starts in this hour, continues to next
+      height = ((60 - startMinutes) / 60) * 100
+    } else if (endHour === slotHour) {
+      // Started in previous hour, ends in this hour
+      height = (endMinutes / 60) * 100
+    } else if (startHour < slotHour && endHour > slotHour) {
+      // Spans through this entire hour
+      height = 100
+    }
+    
+    return {
+      top: `${top}%`,
+      height: `${Math.max(height, 15)}%` // Minimum 15% for visibility
+    }
+  }
+
+  /**
+   * Get barber color for calendar card
+   */
+  const getBarberColor = (barberColor, status) => {
+    if (status === 'no_show') {
+      return { bg: '#8B0000', text: 'white' }
+    }
+    if (status === 'cancelled') {
+      return { bg: '#6B7280', text: 'white' }
+    }
+    
+    const color = barberColor || '#3b82f6'
+    
+    // Completed: darker version
+    if (status === 'completed') {
+      return { bg: `${color}CC`, text: 'white' }
+    }
+    
+    // Confirmed: normal color
+    return { bg: `${color}E6`, text: 'white' }
+  }
+
+  /**
+   * Check if current time is within this slot (for "now" line)
+   */
+  const isCurrentTimeInSlot = (slotTime) => {
+    const today = new Date()
+    const selectedDay = new Date(selectedDate)
+    
+    // Only show "now" line if viewing today
+    if (today.toDateString() !== selectedDay.toDateString()) {
+      return { show: false, position: 0 }
+    }
+    
+    const [slotHour] = slotTime.split(':').map(Number)
+    const currentHour = currentTime.getHours()
+    const currentMinutes = currentTime.getMinutes()
+    
+    if (currentHour === slotHour) {
+      return {
+        show: true,
+        position: (currentMinutes / 60) * 100
+      }
+    }
+    
+    return { show: false, position: 0 }
+  }
+
+  /**
+   * Format time from ISO string
+   */
+  const formatTimeShort = (isoString) => {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    })
+  }
+
+  /**
+   * Check if slot is outside business hours
+   */
+  const isOutsideBusinessHours = (slotTime) => {
+    if (!businessHours || businessHours.is_closed) return true
+    
+    const [slotHour] = slotTime.split(':').map(Number)
+    const [openHour] = businessHours.open_time.split(':').map(Number)
+    const [closeHour] = businessHours.close_time.split(':').map(Number)
+    
+    return slotHour < openHour || slotHour >= closeHour
+  }
+
   // Loading state
   if (isLoading && !appointments.length) {
     return (
@@ -528,8 +865,34 @@ export default function AgendaPage() {
           </p>
         </div>
 
-        {/* Barber Filter and Today Button */}
+        {/* View Toggle, Barber Filter and Today Button */}
         <div className="flex items-center gap-3 flex-wrap">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-gray-100 dark:bg-[#1A1A1A] rounded-xl p-1 border border-gray-200 dark:border-[#2A2A2A]">
+            <button
+              onClick={() => setViewMode('list')}
+              type="button"
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-[#2A2A2A] text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              Lista
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              type="button"
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                viewMode === 'calendar'
+                  ? 'bg-white dark:bg-[#2A2A2A] text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              Calendário
+            </button>
+          </div>
+          
           <button
             onClick={goToToday}
             type="button"
@@ -556,33 +919,6 @@ export default function AgendaPage() {
               ))}
             </select>
           </div>
-        </div>
-      </div>
-
-      {/* Horizontal Date Picker */}
-      <div className="relative">
-        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-          {generateAgendaDates().map((date, index) => {
-            const isSelected = selectedDate.toDateString() === date.toDateString()
-            const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()
-            const dayNumber = date.getDate()
-            
-            return (
-              <button
-                key={index}
-                type="button"
-                onClick={() => setSelectedDate(date)}
-                className={`flex-shrink-0 w-16 h-20 rounded-xl flex flex-col items-center justify-center transition-all ${
-                  isSelected
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105'
-                    : 'bg-white dark:bg-[#1A1A1A] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2A2A2A] hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <span className="text-xs font-medium">{dayName}</span>
-                <span className="text-2xl font-bold mt-1">{dayNumber}</span>
-              </button>
-            )
-          })}
         </div>
       </div>
 
@@ -613,19 +949,278 @@ export default function AgendaPage() {
       {/* Business Hours Info */}
       {businessHours && !businessHours.is_closed && (
         <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-sm text-blue-800 dark:text-blue-400">
-              Horário de funcionamento: {businessHours.open_time} às {businessHours.close_time}
-            </p>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-blue-800 dark:text-blue-400">
+                Horário de funcionamento: {businessHours.open_time} às {businessHours.close_time}
+              </p>
+            </div>
+            {viewMode === 'calendar' && (
+              <div className="text-sm font-semibold text-blue-800 dark:text-blue-400">
+                {appointments.length} agendamento{appointments.length !== 1 ? 's' : ''} hoje
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Capacity View - Occupation Bar */}
-      {businessHours && !businessHours.is_closed && appointments.length > 0 && (
+      {/* Horizontal Date Picker */}
+      <div className="relative">
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+          {generateAgendaDates().map((date, index) => {
+            const isSelected = selectedDate.toDateString() === date.toDateString()
+            const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()
+            const dayNumber = date.getDate()
+            
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => setSelectedDate(date)}
+                className={`flex-shrink-0 w-16 h-20 rounded-xl flex flex-col items-center justify-center transition-all ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105'
+                    : 'bg-white dark:bg-[#1A1A1A] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2A2A2A] hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                <span className="text-xs font-medium">{dayName}</span>
+                <span className="text-2xl font-bold mt-1">{dayNumber}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* CALENDAR VIEW - MOBILE OPTIMIZED */}
+      {viewMode === 'calendar' && !businessHours?.is_closed && (
+        <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-2xl overflow-hidden">
+          {/* Legend - Fixed at top */}
+          <div className="border-b border-gray-200 dark:border-[#2A2A2A] p-3 sm:p-4 bg-gray-50 dark:bg-[#0A0A0A]">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2">
+              {/* Date Display */}
+              <div className="text-sm font-bold text-gray-900 dark:text-white">
+                {selectedDate.toLocaleDateString('pt-BR', { 
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
+                })}
+              </div>
+              
+              {/* Legend */}
+              <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2 text-xs">
+                <span className="text-gray-600 dark:text-gray-400 font-semibold">Legenda:</span>
+                {barbers.map(barber => (
+                  <div key={barber.id} className="flex items-center gap-1.5">
+                    <div 
+                      className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2"
+                      style={{ 
+                        backgroundColor: `${barber.color}E6`,
+                        borderColor: barber.color
+                      }}
+                    />
+                    <span className="text-gray-700 dark:text-gray-300 text-xs">{barber.name}</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-gray-700 border-2 border-gray-800" />
+                  <span className="text-gray-700 dark:text-gray-300 text-xs">Bloqueado</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2" style={{ backgroundColor: '#8B0000', borderColor: '#8B0000' }} />
+                  <span className="text-gray-700 dark:text-gray-300 text-xs">Faltou</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar Grid - Mobile Optimized */}
+          <div className="overflow-x-auto">
+            <div className="min-w-full">
+              {/* Time Slots */}
+              {generateTimeSlots().map((slotTime, index) => {
+                const [slotHour] = slotTime.split(':').map(Number)
+                const appointmentColumns = organizeAppointmentsInColumns(slotTime)
+                const slotsBlocks = getBlocksForSlot(slotTime)
+                const nowLine = isCurrentTimeInSlot(slotTime)
+                const isOutside = isOutsideBusinessHours(slotTime)
+                const totalColumns = Math.max(appointmentColumns.length, 1)
+                
+                return (
+                  <div
+                    key={slotTime}
+                    className={`flex border-b border-gray-100 dark:border-[#2A2A2A] ${
+                      index === 0 ? 'border-t' : ''
+                    } ${isOutside ? 'bg-gray-50/50 dark:bg-[#0A0A0A]/50' : ''}`}
+                  >
+                    {/* Time Label - Mobile: 40px, Desktop: 80px */}
+                    <div className="w-10 sm:w-20 flex-shrink-0 p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-[#2A2A2A] bg-gray-50 dark:bg-[#0A0A0A] sticky left-0 z-30">
+                      {slotTime}
+                    </div>
+
+                    {/* Appointments Area */}
+                    <div className="flex-1 relative min-h-[80px] sm:min-h-[100px]">
+                      {/* Dashed line for empty slots */}
+                      {appointmentColumns.length === 0 && slotsBlocks.length === 0 && !isOutside && (
+                        <div className="absolute inset-0 border-b border-dashed border-gray-200 dark:border-gray-700" style={{ top: '50%' }} />
+                      )}
+
+                      {/* Now Line */}
+                      {nowLine.show && (
+                        <div 
+                          className="absolute left-0 right-0 z-40 pointer-events-none"
+                          style={{ top: `${nowLine.position}%` }}
+                        >
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-red-500 -ml-1.5" />
+                            <div className="flex-1 h-0.5 bg-red-500" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Time Blocks (Bloqueios) */}
+                      {slotsBlocks.map((block, blockIndex) => {
+                        const style = getAppointmentStyle(block, slotHour)
+                        const durationMinutes = (block.end_time - block.start_time) / (1000 * 60)
+                        const isSmallCard = durationMinutes < 30
+                        
+                        return (
+                          <div
+                            key={`block-${blockIndex}`}
+                            className="absolute left-0 right-0 bg-gray-700 p-1.5 sm:p-2 cursor-pointer z-10 shadow-md rounded-lg"
+                            style={{
+                              top: style.top,
+                              height: style.height
+                            }}
+                            onClick={() => openBlockModal(block)}
+                          >
+                            <div className="flex items-center gap-1.5 text-white h-full overflow-hidden">
+                              <span className="text-sm flex-shrink-0">🔒</span>
+                              <div className="flex-1 min-w-0">
+                                {isSmallCard ? (
+                                  // Small card: only start time + reason
+                                  <span className="font-semibold text-[10px] sm:text-xs truncate block">
+                                    {formatTimeShort(block.start_time.toISOString())} • {block.reason || 'Bloqueado'}
+                                  </span>
+                                ) : (
+                                  // Normal card: start - end + reason
+                                  <span className="font-semibold text-[11px] sm:text-sm truncate block">
+                                    {formatTimeShort(block.start_time.toISOString())} - {formatTimeShort(block.end_time.toISOString())} • {block.reason || 'Bloqueado'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* Appointment Columns (No Overlap) - Mobile Optimized */}
+                      <div className="flex h-full" style={{ minWidth: totalColumns > 2 ? `${totalColumns * 150}px` : '100%' }}>
+                        {appointmentColumns.length > 0 ? (
+                          appointmentColumns.map((column, colIndex) => (
+                            <div 
+                              key={colIndex}
+                              className="relative"
+                              style={{ width: `${100 / totalColumns}%`, minWidth: totalColumns > 2 ? '150px' : 'auto' }}
+                            >
+                              {column.map((appointment) => {
+                                const style = getAppointmentStyle(appointment, slotHour)
+                                const colors = getBarberColor(appointment.barbers?.color, appointment.status)
+                                const durationMinutes = (new Date(appointment.end_time) - new Date(appointment.start_time)) / (1000 * 60)
+                                const isSmallCard = durationMinutes < 30
+                                
+                                // Get barber initials
+                                const getBarberInitials = (name) => {
+                                  if (!name) return '?'
+                                  const parts = name.trim().split(' ')
+                                  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
+                                  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                                }
+                                
+                                return (
+                                  <div
+                                    key={appointment.id}
+                                    className="absolute inset-x-0.5 sm:inset-x-1 rounded-lg p-1.5 sm:p-2 cursor-pointer hover:shadow-xl transition-all z-20 shadow-md overflow-hidden"
+                                    style={{
+                                      top: style.top,
+                                      height: style.height,
+                                      backgroundColor: colors.bg,
+                                      color: colors.text
+                                    }}
+                                    onClick={() => {
+                                      openAppointmentModal(appointment)
+                                    }}
+                                  >
+                                    <div className="h-full flex items-start justify-between text-white overflow-hidden gap-1">
+                                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        {isSmallCard ? (
+                                          // Small card: time + name in one line
+                                          <div className="text-[10px] sm:text-xs font-semibold truncate leading-tight">
+                                            {formatTimeShort(appointment.start_time)} • {appointment.client_name || appointment.customer_name || 'Cliente'}
+                                          </div>
+                                        ) : (
+                                          // Normal card: time on top, name below
+                                          <>
+                                            <div className="text-[9px] sm:text-xs opacity-75 mb-0.5">
+                                              {formatTimeShort(appointment.start_time)}
+                                            </div>
+                                            <div className="font-bold text-[11px] sm:text-sm truncate leading-tight">
+                                              {appointment.client_name || appointment.customer_name || 'Cliente'}
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Barber Avatar - Always visible */}
+                                      {appointment.barbers?.name && (
+                                        <div 
+                                          className="flex-shrink-0 rounded-full flex items-center justify-center font-bold text-white shadow-sm"
+                                          style={{
+                                            width: isSmallCard ? '16px' : '24px',
+                                            height: isSmallCard ? '16px' : '24px',
+                                            fontSize: isSmallCard ? '7px' : '9px',
+                                            backgroundColor: `${appointment.barbers.color}99`
+                                          }}
+                                        >
+                                          {getBarberInitials(appointment.barbers.name)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ))
+                        ) : (
+                          // Empty slot
+                          <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                            {!isOutside && (
+                              <button
+                                type="button"
+                                className="text-xs sm:text-sm text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 font-medium px-2 sm:px-4 py-1 sm:py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                                onClick={() => {
+                                  console.log('Create appointment at:', slotTime)
+                                }}
+                              >
+                                + Adicionar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Capacity View - Occupation Bar - ONLY IN LIST VIEW */}
+      {viewMode === 'list' && businessHours && !businessHours.is_closed && appointments.length > 0 && (
         <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#2A2A2A] rounded-[2rem] p-6 shadow-sm">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -754,7 +1349,8 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* Appointments Timeline */}
+      {/* Appointments Timeline - ONLY IN LIST VIEW */}
+      {viewMode === 'list' && (
       <div className="space-y-4">
         {appointments.length === 0 && !businessHours?.is_closed ? (
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-12 text-center">
@@ -893,26 +1489,26 @@ export default function AgendaPage() {
                       <div className="flex-1 p-5">
                         <div className="flex flex-col gap-4">
                           {/* Top Row: Time, Client Info, Price, Status */}
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col sm:flex-row items-start gap-4">
                             {/* Left: Time and Client Info */}
-                            <div className="flex items-start gap-4 flex-1 min-w-0">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
                               {/* Time Badge */}
                               <div className="flex-shrink-0 text-center">
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                                <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                   {formatTime(appointment.start_time)}
                                 </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-500">
-                                  {appointment.services?.duration_minutes || 0} min
+                                <div className="text-xs text-gray-500 dark:text-gray-500 whitespace-nowrap">
+                                  {Math.round((new Date(appointment.end_time) - new Date(appointment.start_time)) / (1000 * 60))} min
                                 </div>
                               </div>
 
                               {/* Client and Service Info */}
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white break-words">
                                   {appointment.client_name}
                                 </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                  {appointment.services?.name || 'Serviço não especificado'}
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">
+                                  {appointment.service_name || appointment.services?.name || 'Serviço não especificado'}
                                 </p>
                                 
                                 {/* Barber Badge with Color */}
@@ -932,7 +1528,7 @@ export default function AgendaPage() {
                                 )}
                                 
                                 {appointment.client_phone && (
-                                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-2 break-all">
                                     📱 {appointment.client_phone}
                                   </p>
                                 )}
@@ -940,23 +1536,23 @@ export default function AgendaPage() {
                             </div>
 
                             {/* Right: Price and Status */}
-                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            <div className="flex flex-col items-end gap-2 flex-shrink-0 w-full sm:w-auto">
                               {/* Price */}
-                              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                              <div className="text-lg sm:text-xl font-bold text-green-400 whitespace-nowrap">
                                 {new Intl.NumberFormat('pt-BR', { 
                                   style: 'currency', 
                                   currency: 'BRL' 
-                                }).format(appointment.services?.price || 0)}
+                                }).format(appointment.price || appointment.services?.price || 0)}
                               </div>
 
                               {/* Status Badge */}
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.className}`}>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.className} whitespace-nowrap`}>
                                 {statusBadge.label}
                               </span>
 
                               {/* Subscriber Badge */}
                               {appointment.is_subscriber && (
-                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 whitespace-nowrap">
                                   ⭐ Assinante
                                 </span>
                               )}
@@ -965,30 +1561,22 @@ export default function AgendaPage() {
 
                           {/* Bottom Row: Action Buttons */}
                           {appointment.status !== 'completed' && appointment.status !== 'cancelled' && (
-                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#2A2A2A]">
+                            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 border-t border-gray-100 dark:border-[#2A2A2A]">
                               {appointment.status !== 'no_show' && (
                                 <>
                                   <button
                                     onClick={() => updateAppointmentStatus(appointment.id, 'completed')}
                                     disabled={isUpdating}
                                     type="button"
-                                    className="text-green-400 bg-green-400/10 hover:bg-green-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                                    className="w-full sm:w-auto text-green-400 bg-green-400/10 hover:bg-green-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
                                   >
                                     {isUpdating ? '...' : 'Concluir'}
-                                  </button>
-                                  <button
-                                    onClick={() => markAsSubscriber(appointment.id)}
-                                    disabled={isUpdating}
-                                    type="button"
-                                    className="text-indigo-400 bg-indigo-400/10 hover:bg-indigo-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
-                                  >
-                                    {isUpdating ? '...' : 'Assinante'}
                                   </button>
                                   <button
                                     onClick={() => updateAppointmentStatus(appointment.id, 'no_show')}
                                     disabled={isUpdating}
                                     type="button"
-                                    className="text-red-400 bg-red-400/10 hover:bg-red-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                                    className="w-full sm:w-auto text-red-400 bg-red-400/10 hover:bg-red-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
                                   >
                                     {isUpdating ? '...' : 'Faltou'}
                                   </button>
@@ -999,7 +1587,7 @@ export default function AgendaPage() {
                                   onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
                                   disabled={isUpdating}
                                   type="button"
-                                  className="text-blue-400 bg-blue-400/10 hover:bg-blue-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                                  className="w-full sm:w-auto text-blue-400 bg-blue-400/10 hover:bg-blue-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
                                 >
                                   {isUpdating ? '...' : 'Restaurar'}
                                 </button>
@@ -1016,6 +1604,7 @@ export default function AgendaPage() {
           </>
         )}
       </div>
+      )}
 
       {/* Summary Footer */}
       {appointments.length > 0 && (
@@ -1040,6 +1629,236 @@ export default function AgendaPage() {
                   • Assinantes não contabilizados
                 </span>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Details Modal */}
+      {showAppointmentModal && selectedAppointment && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3"
+          onClick={closeAppointmentModal}
+        >
+          <div 
+            className="bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-[#2A2A2A] overflow-hidden max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Detalhes do Agendamento
+              </h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-3">
+              {/* Client Name */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Cliente</label>
+                <p className="text-base font-bold text-gray-900 dark:text-white mt-0.5">
+                  {selectedAppointment.client_name || selectedAppointment.customer_name || 'Cliente'}
+                </p>
+              </div>
+
+              {/* Phone */}
+              {selectedAppointment.client_phone && (
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Telefone</label>
+                  <div className="flex gap-2 mt-1">
+                    <a
+                      href={`tel:${selectedAppointment.client_phone}`}
+                      className="flex-1 px-3 py-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-semibold hover:bg-blue-500/20 transition-all text-center"
+                    >
+                      📞 Ligar
+                    </a>
+                    <a
+                      href={`https://wa.me/55${selectedAppointment.client_phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 px-3 py-2 bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg text-sm font-semibold hover:bg-green-500/20 transition-all text-center"
+                    >
+                      💬 WhatsApp
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Service */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Serviço</label>
+                <p className="text-sm text-gray-900 dark:text-white mt-0.5">
+                  {selectedAppointment.service_name || selectedAppointment.services?.name || 'Serviço não especificado'}
+                </p>
+              </div>
+
+              {/* Time and Duration */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Horário</label>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
+                    {formatTime(selectedAppointment.start_time)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Duração</label>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
+                    {Math.round((new Date(selectedAppointment.end_time) - new Date(selectedAppointment.start_time)) / (1000 * 60))} min
+                  </p>
+                </div>
+              </div>
+
+              {/* Price */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Valor</label>
+                <p className="text-xl font-bold text-green-500 dark:text-green-400 mt-0.5">
+                  {new Intl.NumberFormat('pt-BR', { 
+                    style: 'currency', 
+                    currency: 'BRL' 
+                  }).format(selectedAppointment.price || selectedAppointment.services?.price || 0)}
+                </p>
+              </div>
+
+              {/* Barber */}
+              {selectedAppointment.barbers?.name && (
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Barbeiro</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div 
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-md"
+                      style={{ backgroundColor: selectedAppointment.barbers.color }}
+                    >
+                      {selectedAppointment.barbers.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {selectedAppointment.barbers.name}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Status */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</label>
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${getStatusBadge(selectedAppointment.status).className}`}>
+                  {getStatusBadge(selectedAppointment.status).label}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t border-gray-200 dark:border-[#2A2A2A] flex flex-col gap-2">
+              {selectedAppointment.status !== 'completed' && selectedAppointment.status !== 'cancelled' && (
+                <>
+                  {selectedAppointment.status !== 'no_show' && (
+                    <>
+                      <button
+                        onClick={() => updateAppointmentStatusFromModal(selectedAppointment.id, 'completed')}
+                        disabled={updatingStatus === selectedAppointment.id}
+                        type="button"
+                        className="w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 text-sm"
+                      >
+                        {updatingStatus === selectedAppointment.id ? 'Atualizando...' : '✓ Concluir'}
+                      </button>
+                      <button
+                        onClick={() => updateAppointmentStatusFromModal(selectedAppointment.id, 'no_show')}
+                        disabled={updatingStatus === selectedAppointment.id}
+                        type="button"
+                        className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 text-sm"
+                      >
+                        {updatingStatus === selectedAppointment.id ? 'Atualizando...' : '✗ Faltou'}
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+              <button
+                onClick={closeAppointmentModal}
+                type="button"
+                className="w-full px-4 py-2.5 bg-gray-200 dark:bg-[#2A2A2A] hover:bg-gray-300 dark:hover:bg-[#3A3A3A] text-gray-900 dark:text-white rounded-xl font-bold transition-all text-sm"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Block Details Modal */}
+      {showBlockModal && selectedBlock && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3"
+          onClick={closeBlockModal}
+        >
+          <div 
+            className="bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-[#2A2A2A] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                🔒 Bloqueio de Horário
+              </h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-3">
+              {/* Time Range */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Horário</label>
+                <p className="text-base font-bold text-gray-900 dark:text-white mt-0.5">
+                  {formatTime(selectedBlock.start_time.toISOString())} - {formatTime(selectedBlock.end_time.toISOString())}
+                </p>
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Motivo</label>
+                <p className="text-sm text-gray-900 dark:text-white mt-0.5">
+                  {selectedBlock.reason || 'Sem motivo especificado'}
+                </p>
+              </div>
+
+              {/* Barber */}
+              {selectedBlock.barber_id && (
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Barbeiro</label>
+                  <p className="text-sm text-gray-900 dark:text-white mt-0.5">
+                    {barbers.find(b => b.id === selectedBlock.barber_id)?.name || 'Barbeiro não encontrado'}
+                  </p>
+                </div>
+              )}
+
+              {/* Type */}
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tipo</label>
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${
+                  selectedBlock.type === 'fixed' 
+                    ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20'
+                    : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                }`}>
+                  {selectedBlock.type === 'fixed' ? 'Bloqueio Fixo (Recorrente)' : 'Bloqueio Pontual'}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t border-gray-200 dark:border-[#2A2A2A] flex flex-col gap-2">
+              <button
+                onClick={() => removeTimeBlock(selectedBlock)}
+                disabled={updatingStatus === selectedBlock.id}
+                type="button"
+                className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 text-sm"
+              >
+                {updatingStatus === selectedBlock.id ? 'Removendo...' : '🗑️ Remover Bloqueio'}
+              </button>
+              <button
+                onClick={closeBlockModal}
+                type="button"
+                className="w-full px-4 py-2.5 bg-gray-200 dark:bg-[#2A2A2A] hover:bg-gray-300 dark:hover:bg-[#3A3A3A] text-gray-900 dark:text-white rounded-xl font-bold transition-all text-sm"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
