@@ -14,11 +14,16 @@ import {
   ChevronRight
 } from 'lucide-react'
 
+// Tempo limite para cancelamento com liberação de horário (em minutos)
+const CANCELLATION_THRESHOLD_MINUTES = 20
+
 export default function DashboardHome() {
   const [loading, setLoading] = useState(true)
   const [barbershopId, setBarbershopId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [appointments, setAppointments] = useState([])
+  const [showNoShowConfirmModal, setShowNoShowConfirmModal] = useState(false)
+  const [noShowAppointment, setNoShowAppointment] = useState(null)
   const [dashboardData, setDashboardData] = useState({
     todayRevenue: 0,
     todayNetProfit: 0,
@@ -233,21 +238,49 @@ export default function DashboardHome() {
     }
   }
 
-  const handleMarkNoShow = async (appointmentId) => {
+  const handleMarkNoShow = async (appointment) => {
+    setNoShowAppointment(appointment)
+    setShowNoShowConfirmModal(true)
+  }
+
+  /**
+   * Check if appointment is with advance notice (20+ minutes)
+   */
+  const isWithAdvanceNotice = (appointment) => {
+    const THRESHOLD = CANCELLATION_THRESHOLD_MINUTES
+    const now = new Date()
+    const appointmentTime = new Date(appointment.start_time)
+    const minutesUntilAppointment = (appointmentTime - now) / (1000 * 60)
+    return minutesUntilAppointment >= THRESHOLD
+  }
+
+  /**
+   * Confirm no-show with smart logic
+   */
+  const confirmNoShow = async (shouldCancel) => {
+    if (!noShowAppointment) return
+
     try {
+      const newStatus = shouldCancel ? 'cancelled' : 'no_show'
+      
       const { error } = await supabase
         .from('appointments')
-        .update({ status: 'no_show' })
-        .eq('id', appointmentId)
+        .update({ status: newStatus })
+        .eq('id', noShowAppointment.id)
 
       if (error) throw error
 
       // Recarregar dados
       await fetchDashboardData()
-      showToast.warning(
-        'Cliente marcado como faltante.',
-        'Falta Registrada'
-      )
+      
+      const message = shouldCancel 
+        ? 'Horário liberado para novos agendamentos'
+        : 'Agendamento marcado como falta. Horário não foi liberado pois está próximo ou já passou.'
+      
+      showToast.warning(message, 'Falta Registrada')
+      
+      setShowNoShowConfirmModal(false)
+      setNoShowAppointment(null)
     } catch (error) {
       console.error('Erro ao marcar falta:', error)
       showToast.error(
@@ -745,7 +778,7 @@ export default function DashboardHome() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Agendamentos do Dia
             </h2>
-            <div className="space-y-3">
+            <div className="bg-white dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
               {appointments.map((appointment) => {
                 const statusInfo = getStatusBadge(appointment.status)
                 const appointmentTime = new Date(appointment.start_time)
@@ -773,103 +806,64 @@ export default function DashboardHome() {
                 return (
                   <div
                     key={appointment.id}
-                    className="relative bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all"
+                    className="relative bg-white dark:bg-white/[0.03] backdrop-blur-xl border-b border-gray-200 dark:border-white/10 last:border-b-0 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-all shadow-sm"
                   >
                     {/* Barra Colorida Lateral */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${getStatusBarColor(appointment.status)}`} />
                     
-                    <div className="p-4 pl-6">
-                      <div className="flex flex-col gap-3">
-                        {/* Linha 1: Horário e Status */}
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="text-xl font-bold text-gray-900 dark:text-white">
-                            {appointmentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            statusInfo.color === 'green' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' :
-                            statusInfo.color === 'blue' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
-                            statusInfo.color === 'red' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
-                            'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
-                          }`}>
-                            {statusInfo.label}
-                          </span>
-                        </div>
-
-                        {/* Linha 2: Nome do Cliente */}
-                        <p className="text-gray-900 dark:text-white font-bold text-lg break-words">
+                    <div className="p-3 pl-4">
+                      {/* LINHA 1: Horário, Nome, Valor, Status */}
+                      <div className="flex items-center gap-3 flex-wrap mb-1.5">
+                        <span className="text-lg font-bold text-gray-900 dark:text-white">
+                          {appointmentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-base font-bold text-gray-900 dark:text-white flex-1 min-w-0 truncate">
                           {appointment.client_name}
-                        </p>
+                        </span>
+                        <span className="text-base font-bold text-green-600 dark:text-green-400 whitespace-nowrap">
+                          {appointment.price ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.price) : 'R$ 0,00'}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                          statusInfo.color === 'green' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' :
+                          statusInfo.color === 'blue' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
+                          statusInfo.color === 'red' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
+                          'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
+                        }`}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
 
-                        {/* Linha 3: Valor Total - DESTAQUE */}
-                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2 inline-block w-fit">
-                          <span className="text-xl font-bold text-green-400">
-                            {appointment.price ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.price) : 'R$ 0,00'}
-                          </span>
-                        </div>
+                      {/* LINHA 2: Serviço • Duração • Barbeiro • Telefone */}
+                      <div className="text-sm text-gray-600 dark:text-gray-400 truncate mb-2">
+                        {appointment.service_name || appointment.services?.name || 'Serviço'} • {durationMinutes} min • {appointment.barbers?.name || 'Barbeiro'} • {appointment.client_phone}
+                      </div>
 
-                        {/* Linha 4: Serviço(s) e Duração */}
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white break-words">
-                            {appointment.service_name || appointment.services?.name || 'Serviço'}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            ⏱️ {durationMinutes} minutos
-                          </p>
-                        </div>
-
-                        {/* Linha 5: Barbeiro */}
-                        <div className="flex items-center gap-2">
-                          <span 
-                            className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                          >
-                            👤 {appointment.barbers?.name || 'Barbeiro'}
-                          </span>
-                        </div>
-
-                        {/* Linha 6: Telefone */}
-                        <p className="text-sm text-gray-600 dark:text-gray-400 break-all">
-                          📱 {appointment.client_phone}
-                        </p>
-
-                        {/* Linha 7: Botões de Ação */}
-                        <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-white/10">
-                          {appointment.status === 'confirmed' && (
-                            <>
-                              <button
-                                onClick={() => handleCompleteAppointment(appointment.id)}
-                                className="w-full sm:flex-1 px-4 py-3 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
-                                style={{ 
-                                  background: 'rgba(34, 197, 94, 0.1)',
-                                  color: 'rgb(74, 222, 128)'
-                                }}
-                              >
-                                ✓ Concluir
-                              </button>
-                              <button
-                                onClick={() => handleMarkNoShow(appointment.id)}
-                                className="w-full sm:flex-1 px-4 py-3 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
-                                style={{ 
-                                  background: 'rgba(239, 68, 68, 0.1)',
-                                  color: 'rgb(248, 113, 113)'
-                                }}
-                              >
-                                ✗ Faltou
-                              </button>
-                            </>
-                          )}
-                          {(appointment.status === 'completed' || appointment.status === 'no_show') && (
+                      {/* Botões de Ação - Sempre visíveis */}
+                      <div className="flex gap-2">
+                        {appointment.status === 'confirmed' && (
+                          <>
                             <button
-                              onClick={() => handleRestoreAppointment(appointment.id)}
-                              className="w-full px-4 py-3 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
-                              style={{ 
-                                background: `rgba(${getComputedStyle(document.documentElement).getPropertyValue('--brand-color') || '99, 102, 241'}, 0.1)`,
-                                color: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--brand-color') || '99, 102, 241'})`
-                              }}
+                              onClick={() => handleCompleteAppointment(appointment.id)}
+                              className="px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/20 rounded-lg text-xs font-semibold transition-all"
                             >
-                              ↻ Restaurar
+                              ✓ Concluir
                             </button>
-                          )}
-                        </div>
+                            <button
+                              onClick={() => handleMarkNoShow(appointment)}
+                              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-lg text-xs font-semibold transition-all"
+                            >
+                              ✗ Faltou
+                            </button>
+                          </>
+                        )}
+                        {(appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled') && (
+                          <button
+                            onClick={() => handleRestoreAppointment(appointment.id)}
+                            className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-lg text-xs font-semibold transition-all"
+                          >
+                            ↻ Restaurar
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -879,6 +873,100 @@ export default function DashboardHome() {
           </div>
         )}
       </div>
+
+      {/* No-Show Confirmation Modal */}
+      {showNoShowConfirmModal && noShowAppointment && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3"
+          onClick={() => {
+            setShowNoShowConfirmModal(false)
+            setNoShowAppointment(null)
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-[#2A2A2A] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                ⚠️ Confirmar Falta
+              </h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {isWithAdvanceNotice(noShowAppointment) ? (
+                <>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    O cliente faltou com antecedência.
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Deseja liberar o horário das <span className="font-bold">
+                      {new Date(noShowAppointment.start_time).toLocaleTimeString('pt-BR', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false 
+                      })}
+                    </span> para novos agendamentos?
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Faltando menos de 20 minutos o horário não será liberado para evitar conflitos.
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Confirmar falta?
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t border-gray-200 dark:border-[#2A2A2A] flex flex-col gap-2">
+              {isWithAdvanceNotice(noShowAppointment) ? (
+                <>
+                  <button
+                    onClick={() => confirmNoShow(true)}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-all text-sm"
+                  >
+                    ✓ Sim, liberar horário
+                  </button>
+                  <button
+                    onClick={() => confirmNoShow(false)}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all text-sm"
+                  >
+                    ✗ Não liberar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => confirmNoShow(false)}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all text-sm"
+                  >
+                    ✓ Confirmar falta
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNoShowConfirmModal(false)
+                      setNoShowAppointment(null)
+                    }}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-gray-200 dark:bg-[#2A2A2A] hover:bg-gray-300 dark:hover:bg-[#3A3A3A] text-gray-900 dark:text-white rounded-xl font-bold transition-all text-sm"
+                  >
+                    Cancelar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

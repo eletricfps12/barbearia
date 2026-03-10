@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Zap, TrendingUp, AlertCircle } from 'lucide-react'
 
+// Tempo limite para cancelamento com liberação de horário (em minutos)
+const CANCELLATION_THRESHOLD_MINUTES = 20
+
 /**
  * AgendaPage Component - Daily Timeline Schedule Management with Capacity View
  * 
@@ -48,6 +51,8 @@ export default function AgendaPage() {
   const [selectedBlock, setSelectedBlock] = useState(null)
   const [showAppointmentModal, setShowAppointmentModal] = useState(false)
   const [showBlockModal, setShowBlockModal] = useState(false)
+  const [showNoShowConfirmModal, setShowNoShowConfirmModal] = useState(false)
+  const [noShowAppointment, setNoShowAppointment] = useState(null)
   
   // Update current time every minute for "now" line
   useEffect(() => {
@@ -517,8 +522,71 @@ export default function AgendaPage() {
    * Update appointment status from modal
    */
   const updateAppointmentStatusFromModal = async (appointmentId, newStatus) => {
+    // Se for marcar como "faltou", usar a lógica inteligente
+    if (newStatus === 'no_show') {
+      const appointment = appointments.find(apt => apt.id === appointmentId)
+      if (appointment) {
+        handleNoShowClick(appointment)
+        return
+      }
+    }
+    
     await updateAppointmentStatus(appointmentId, newStatus)
     closeAppointmentModal()
+  }
+
+  /**
+   * Handle "Faltou" button click with smart logic
+   */
+  const handleNoShowClick = (appointment) => {
+    setNoShowAppointment(appointment)
+    setShowNoShowConfirmModal(true)
+    // Fechar modal de detalhes se estiver aberto
+    if (showAppointmentModal) {
+      closeAppointmentModal()
+    }
+  }
+
+  /**
+   * Check if appointment is with advance notice (20+ minutes)
+   */
+  const isWithAdvanceNotice = (appointment) => {
+    const THRESHOLD = CANCELLATION_THRESHOLD_MINUTES
+    const now = new Date()
+    const appointmentTime = new Date(appointment.start_time)
+    const minutesUntilAppointment = (appointmentTime - now) / (1000 * 60)
+    return minutesUntilAppointment >= THRESHOLD
+  }
+
+  /**
+   * Confirm no-show with smart logic
+   */
+  const confirmNoShow = async (shouldCancel) => {
+    if (!noShowAppointment) return
+
+    try {
+      setUpdatingStatus(noShowAppointment.id)
+
+      const newStatus = shouldCancel ? 'cancelled' : 'no_show'
+      
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ status: newStatus })
+        .eq('id', noShowAppointment.id)
+
+      if (updateError) throw updateError
+
+      // Reload appointments
+      await fetchAppointments()
+      
+      setShowNoShowConfirmModal(false)
+      setNoShowAppointment(null)
+    } catch (err) {
+      console.error('Error updating status:', err)
+      setError('Erro ao atualizar status')
+    } finally {
+      setUpdatingStatus(null)
+    }
   }
 
   /**
@@ -1573,7 +1641,7 @@ export default function AgendaPage() {
                                     {isUpdating ? '...' : 'Concluir'}
                                   </button>
                                   <button
-                                    onClick={() => updateAppointmentStatus(appointment.id, 'no_show')}
+                                    onClick={() => handleNoShowClick(appointment)}
                                     disabled={isUpdating}
                                     type="button"
                                     className="w-full sm:w-auto text-red-400 bg-red-400/10 hover:bg-red-400/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-xl text-sm font-bold transition-all"
@@ -1779,6 +1847,97 @@ export default function AgendaPage() {
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No-Show Confirmation Modal */}
+      {showNoShowConfirmModal && noShowAppointment && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3"
+          onClick={() => {
+            setShowNoShowConfirmModal(false)
+            setNoShowAppointment(null)
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-[#2A2A2A] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-[#2A2A2A]">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                ⚠️ Confirmar Falta
+              </h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {isWithAdvanceNotice(noShowAppointment) ? (
+                <>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    O cliente faltou com antecedência.
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Deseja liberar o horário das <span className="font-bold">{formatTime(noShowAppointment.start_time)}</span> para novos agendamentos?
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Faltando menos de 20 minutos o horário não será liberado para evitar conflitos.
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Confirmar falta?
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-t border-gray-200 dark:border-[#2A2A2A] flex flex-col gap-2">
+              {isWithAdvanceNotice(noShowAppointment) ? (
+                <>
+                  <button
+                    onClick={() => confirmNoShow(true)}
+                    disabled={updatingStatus === noShowAppointment.id}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 text-sm"
+                  >
+                    {updatingStatus === noShowAppointment.id ? 'Processando...' : '✓ Sim, liberar horário'}
+                  </button>
+                  <button
+                    onClick={() => confirmNoShow(false)}
+                    disabled={updatingStatus === noShowAppointment.id}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 text-sm"
+                  >
+                    {updatingStatus === noShowAppointment.id ? 'Processando...' : '✗ Não liberar'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => confirmNoShow(false)}
+                    disabled={updatingStatus === noShowAppointment.id}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all disabled:opacity-50 text-sm"
+                  >
+                    {updatingStatus === noShowAppointment.id ? 'Processando...' : '✓ Confirmar falta'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNoShowConfirmModal(false)
+                      setNoShowAppointment(null)
+                    }}
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-gray-200 dark:bg-[#2A2A2A] hover:bg-gray-300 dark:hover:bg-[#3A3A3A] text-gray-900 dark:text-white rounded-xl font-bold transition-all text-sm"
+                  >
+                    Cancelar
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
