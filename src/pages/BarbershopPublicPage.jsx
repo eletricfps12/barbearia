@@ -209,7 +209,31 @@ export default function BarbershopPublicPage() {
         }
       })
 
-      // 5. Extrair open_time e close_time do banco (formato: "HH:mm:ss" ou "HH:mm")
+      // 5. Buscar bloqueios fixos (recorrentes)
+      const { data: fixedBlocks, error: fixedBlocksError } = await supabase
+        .from('fixed_time_blocks')
+        .select('barber_id, start_time, end_time')
+        .eq('barbershop_id', barbershop.id)
+        .or(`barber_id.is.null,barber_id.eq.${selectedBarber.id}`)
+
+      if (fixedBlocksError) throw fixedBlocksError
+
+      console.log('🔒 Bloqueios fixos encontrados:', fixedBlocks)
+
+      // 6. Buscar bloqueios pontuais (data específica)
+      const { data: oneTimeBlocks, error: oneTimeBlocksError } = await supabase
+        .from('time_blocks')
+        .select('barber_id, start_time, end_time')
+        .eq('barbershop_id', barbershop.id)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString())
+        .or(`barber_id.is.null,barber_id.eq.${selectedBarber.id}`)
+
+      if (oneTimeBlocksError) throw oneTimeBlocksError
+
+      console.log('📅 Bloqueios pontuais encontrados:', oneTimeBlocks)
+
+      // 7. Extrair open_time e close_time do banco (formato: "HH:mm:ss" ou "HH:mm")
       const openTime = businessHours.open_time.substring(0, 5) // "09:00:00" -> "09:00"
       const closeTime = businessHours.close_time.substring(0, 5) // "18:00:00" -> "18:00"
 
@@ -223,10 +247,12 @@ export default function BarbershopPublicPage() {
         totalDuration,
         isClosed: businessHours.is_closed,
         selectedDate: selectedDate.toLocaleDateString('pt-BR'),
-        selectedDateObj: selectedDate
+        selectedDateObj: selectedDate,
+        fixedBlocksCount: fixedBlocks?.length || 0,
+        oneTimeBlocksCount: oneTimeBlocks?.length || 0
       })
 
-      // 6. Gerar slots disponíveis usando horários reais do banco
+      // 8. Gerar slots disponíveis usando horários reais do banco
       // Formatar data no formato YYYY-MM-DD sem conversão de timezone
       const year = selectedDate.getFullYear()
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
@@ -246,7 +272,10 @@ export default function BarbershopPublicPage() {
         totalDuration, // Usa duração total dos serviços
         transformedAppointments,
         openTime,
-        closeTime
+        closeTime,
+        fixedBlocks || [], // Bloqueios fixos
+        oneTimeBlocks || [], // Bloqueios pontuais
+        selectedBarber.id // ID do barbeiro
       )
 
       console.log('Slots gerados:', slots.length, slots)

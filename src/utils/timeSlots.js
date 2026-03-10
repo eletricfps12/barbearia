@@ -45,22 +45,27 @@ function timesOverlap(start1, end1, start2, end2) {
 }
 
 /**
- * Generates available time slots for a given date, considering service duration
- * and existing appointments.
+ * Generates available time slots for a given date, considering service duration,
+ * existing appointments, and time blocks (fixed and one-time).
  * 
  * MISSÃO 1: Oculta horários antigos no dia atual (timezone America/Sao_Paulo)
  * MISSÃO 2: Respeita horários de funcionamento configurados
+ * MISSÃO 3: Respeita bloqueios fixos (recorrentes todos os dias)
+ * MISSÃO 4: Respeita bloqueios pontuais (data específica)
  * 
  * @param {string} date - Date in format "YYYY-MM-DD"
  * @param {number} serviceDuration - Duration of service in minutes
  * @param {Array} existingAppointments - Array of existing appointments with start_time and end_time
  * @param {string} openTime - Business opening time in format "HH:mm" (default: "09:00")
  * @param {string} closeTime - Business closing time in format "HH:mm" (default: "18:00")
+ * @param {Array} fixedBlocks - Array of fixed time blocks (recurrent) with start_time and end_time
+ * @param {Array} oneTimeBlocks - Array of one-time blocks for specific date with start_time and end_time
+ * @param {string} barberId - ID of the barber to check blocks for (null = all barbers)
  * @returns {Array} Array of available time slot objects { time: "HH:mm", available: true }
  * 
  * Requirements: 5.1, 5.4
  */
-export function generateAvailableSlots(date, serviceDuration, existingAppointments = [], openTime = '09:00', closeTime = '18:00') {
+export function generateAvailableSlots(date, serviceDuration, existingAppointments = [], openTime = '09:00', closeTime = '18:00', fixedBlocks = [], oneTimeBlocks = [], barberId = null) {
   const slots = []
   const slotInterval = 30 // minutes
   
@@ -129,7 +134,51 @@ export function generateAvailableSlots(date, serviceDuration, existingAppointmen
       console.log(`❌ Slot ${slotTime} tem conflito com agendamento existente`)
     }
     
-    if (!hasConflict) {
+    // MISSÃO 3: Check for conflicts with fixed blocks (recurrent)
+    const hasFixedBlockConflict = fixedBlocks.some(block => {
+      // Se o bloco tem barber_id null, bloqueia para todos
+      // Se o bloco tem barber_id específico, só bloqueia se for o mesmo barbeiro
+      const appliesToBarber = !block.barber_id || block.barber_id === barberId
+      
+      if (!appliesToBarber) return false
+      
+      return timesOverlap(slotTime, slotEnd, block.start_time, block.end_time)
+    })
+    
+    if (hasFixedBlockConflict) {
+      console.log(`🔒 Slot ${slotTime} bloqueado por bloqueio fixo`)
+    }
+    
+    // MISSÃO 4: Check for conflicts with one-time blocks (specific date)
+    const hasOneTimeBlockConflict = oneTimeBlocks.some(block => {
+      // Se o bloco tem barber_id null, bloqueia para todos
+      // Se o bloco tem barber_id específico, só bloqueia se for o mesmo barbeiro
+      const appliesToBarber = !block.barber_id || block.barber_id === barberId
+      
+      if (!appliesToBarber) return false
+      
+      // Extrair apenas o horário do timestamp (formato: "HH:mm")
+      const blockStartTime = new Date(block.start_time).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Sao_Paulo'
+      })
+      const blockEndTime = new Date(block.end_time).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Sao_Paulo'
+      })
+      
+      return timesOverlap(slotTime, slotEnd, blockStartTime, blockEndTime)
+    })
+    
+    if (hasOneTimeBlockConflict) {
+      console.log(`📅 Slot ${slotTime} bloqueado por bloqueio pontual`)
+    }
+    
+    if (!hasConflict && !hasFixedBlockConflict && !hasOneTimeBlockConflict) {
       slots.push({ time: slotTime, available: true })
     }
   }

@@ -749,6 +749,10 @@ export default function DashboardHome() {
               {appointments.map((appointment) => {
                 const statusInfo = getStatusBadge(appointment.status)
                 const appointmentTime = new Date(appointment.start_time)
+                const appointmentEndTime = new Date(appointment.end_time)
+                
+                // Calcular duração em minutos
+                const durationMinutes = Math.round((appointmentEndTime - appointmentTime) / (1000 * 60))
                 
                 // Definir cor da barra lateral baseado no status
                 const getStatusBarColor = (status) => {
@@ -775,71 +779,96 @@ export default function DashboardHome() {
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${getStatusBarColor(appointment.status)}`} />
                     
                     <div className="p-4 pl-6">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        {/* Info do Agendamento */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="text-lg font-bold text-gray-900 dark:text-white">
-                              {appointmentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              statusInfo.color === 'green' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' :
-                              statusInfo.color === 'blue' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
-                              statusInfo.color === 'red' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
-                              'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
-                            }`}>
-                              {statusInfo.label}
-                            </span>
-                          </div>
-                          <p className="text-gray-900 dark:text-white font-semibold">
-                            {appointment.client_name}
+                      <div className="flex flex-col gap-3">
+                        {/* Linha 1: Horário e Status */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-xl font-bold text-gray-900 dark:text-white">
+                            {appointmentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            statusInfo.color === 'green' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' :
+                            statusInfo.color === 'blue' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' :
+                            statusInfo.color === 'red' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
+                            'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
+                          }`}>
+                            {statusInfo.label}
+                          </span>
+                        </div>
+
+                        {/* Linha 2: Nome do Cliente */}
+                        <p className="text-gray-900 dark:text-white font-bold text-lg break-words">
+                          {appointment.client_name}
+                        </p>
+
+                        {/* Linha 3: Valor Total - DESTAQUE */}
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2 inline-block w-fit">
+                          <span className="text-xl font-bold text-green-400">
+                            {appointment.price ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.price) : 'R$ 0,00'}
+                          </span>
+                        </div>
+
+                        {/* Linha 4: Serviço(s) e Duração */}
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white break-words">
+                            {appointment.service_name || appointment.services?.name || 'Serviço'}
                           </p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {appointment.services?.name} • {appointment.barbers?.name}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {appointment.client_phone}
+                            ⏱️ {durationMinutes} minutos
                           </p>
                         </div>
 
-                        {/* Botões de Ação */}
-                        <div className="flex gap-2">
-                        {appointment.status === 'confirmed' && (
-                          <>
-                            <button
-                              onClick={() => handleCompleteAppointment(appointment.id)}
-                              className="px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
-                              style={{ 
-                                background: 'rgba(34, 197, 94, 0.1)',
-                                color: 'rgb(74, 222, 128)'
-                              }}
-                            >
-                              Concluir
-                            </button>
-                            <button
-                              onClick={() => handleMarkNoShow(appointment.id)}
-                              className="px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
-                              style={{ 
-                                background: 'rgba(239, 68, 68, 0.1)',
-                                color: 'rgb(248, 113, 113)'
-                              }}
-                            >
-                              Faltou
-                            </button>
-                          </>
-                        )}
-                        {(appointment.status === 'completed' || appointment.status === 'no_show') && (
-                          <button
-                            onClick={() => handleRestoreAppointment(appointment.id)}
-                            className="px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
-                            style={{ 
-                              background: `rgba(${getComputedStyle(document.documentElement).getPropertyValue('--brand-color') || '99, 102, 241'}, 0.1)`,
-                              color: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--brand-color') || '99, 102, 241'})`
-                            }}
+                        {/* Linha 5: Barbeiro */}
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20"
                           >
-                            Restaurar
-                          </button>
-                        )}
+                            👤 {appointment.barbers?.name || 'Barbeiro'}
+                          </span>
+                        </div>
+
+                        {/* Linha 6: Telefone */}
+                        <p className="text-sm text-gray-600 dark:text-gray-400 break-all">
+                          📱 {appointment.client_phone}
+                        </p>
+
+                        {/* Linha 7: Botões de Ação */}
+                        <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-white/10">
+                          {appointment.status === 'confirmed' && (
+                            <>
+                              <button
+                                onClick={() => handleCompleteAppointment(appointment.id)}
+                                className="w-full sm:flex-1 px-4 py-3 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
+                                style={{ 
+                                  background: 'rgba(34, 197, 94, 0.1)',
+                                  color: 'rgb(74, 222, 128)'
+                                }}
+                              >
+                                ✓ Concluir
+                              </button>
+                              <button
+                                onClick={() => handleMarkNoShow(appointment.id)}
+                                className="w-full sm:flex-1 px-4 py-3 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
+                                style={{ 
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  color: 'rgb(248, 113, 113)'
+                                }}
+                              >
+                                ✗ Faltou
+                              </button>
+                            </>
+                          )}
+                          {(appointment.status === 'completed' || appointment.status === 'no_show') && (
+                            <button
+                              onClick={() => handleRestoreAppointment(appointment.id)}
+                              className="w-full px-4 py-3 border border-white/10 rounded-xl text-sm font-semibold transition-all hover:bg-white/[0.05]"
+                              style={{ 
+                                background: `rgba(${getComputedStyle(document.documentElement).getPropertyValue('--brand-color') || '99, 102, 241'}, 0.1)`,
+                                color: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--brand-color') || '99, 102, 241'})`
+                              }}
+                            >
+                              ↻ Restaurar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

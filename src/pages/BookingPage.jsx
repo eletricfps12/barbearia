@@ -281,6 +281,30 @@ export default function BookingPage() {
 
       console.log('Appointments encontrados:', transformedAppointments)
 
+      // MISSÃO 3: Buscar bloqueios fixos (recorrentes)
+      const { data: fixedBlocks, error: fixedBlocksError } = await supabase
+        .from('fixed_time_blocks')
+        .select('barber_id, start_time, end_time')
+        .eq('barbershop_id', barber.barbershop_id)
+        .or(`barber_id.is.null,barber_id.eq.${barberId}`)
+
+      if (fixedBlocksError) throw fixedBlocksError
+
+      console.log('🔒 Bloqueios fixos encontrados:', fixedBlocks)
+
+      // MISSÃO 4: Buscar bloqueios pontuais (data específica)
+      const { data: oneTimeBlocks, error: oneTimeBlocksError } = await supabase
+        .from('time_blocks')
+        .select('barber_id, start_time, end_time')
+        .eq('barbershop_id', barber.barbershop_id)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString())
+        .or(`barber_id.is.null,barber_id.eq.${barberId}`)
+
+      if (oneTimeBlocksError) throw oneTimeBlocksError
+
+      console.log('📅 Bloqueios pontuais encontrados:', oneTimeBlocks)
+
       // USA OS HORÁRIOS VINDOS DO BANCO, NÃO OS HARDCODED
       const openTime = hoursToUse?.open_time || '09:00'
       const closeTime = hoursToUse?.close_time || '18:00'
@@ -290,7 +314,9 @@ export default function BookingPage() {
         closeTime,
         totalDuration,
         hoursToUse,
-        isClosed: hoursToUse?.is_closed
+        isClosed: hoursToUse?.is_closed,
+        fixedBlocksCount: fixedBlocks?.length || 0,
+        oneTimeBlocksCount: oneTimeBlocks?.length || 0
       })
       
       const dateStr = selectedDate.toISOString().split('T')[0]
@@ -299,7 +325,10 @@ export default function BookingPage() {
         totalDuration, // Usa duração total dos serviços
         transformedAppointments,
         openTime,
-        closeTime
+        closeTime,
+        fixedBlocks || [], // Bloqueios fixos
+        oneTimeBlocks || [], // Bloqueios pontuais
+        barberId // ID do barbeiro
       )
 
       console.log('Slots gerados:', slots.length, slots)
