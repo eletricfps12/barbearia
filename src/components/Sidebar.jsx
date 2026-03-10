@@ -167,17 +167,15 @@ export default function Sidebar({ onLinkClick }) {
         {/* Logo Section - Brio App Branding */}
         <div className="p-6" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center gap-3">
-            {/* Brio Logo - Minimalist "B" */}
-            <div 
-              className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-lg" 
+            {/* Brio Logo - Imagem com bordas arredondadas */}
+            <img 
+              src="/favicon.jpeg" 
+              alt="Brio Logo"
+              className="w-10 h-10 rounded-2xl object-cover"
               style={{ 
-                background: '#050505',
-                color: '#ffffff',
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }}
-            >
-              B
-            </div>
+            />
             <div>
               <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                 Brio
