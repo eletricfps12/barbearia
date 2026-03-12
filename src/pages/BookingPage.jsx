@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateAvailableSlots } from '../utils/timeSlots'
+import { useHaptic } from '../hooks/useHaptic'
 import BarberInfo from '../components/BarberInfo'
 import ServiceCard from '../components/ServiceCard'
 import HorizontalCalendar from '../components/HorizontalCalendar'
@@ -18,6 +19,7 @@ import TimeSlotButton from '../components/TimeSlotButton'
  */
 export default function BookingPage() {
   const { barberId } = useParams()
+  const haptic = useHaptic()
 
   // State management
   const [barber, setBarber] = useState(null)
@@ -409,11 +411,13 @@ export default function BookingPage() {
 
     // Validate client data
     if (clientName.trim().length < 3) {
+      haptic.error()
       setError('Por favor, digite seu nome completo.')
       return
     }
 
     if (clientPhone.trim().length < 10) {
+      haptic.error()
       setError('Por favor, digite um telefone válido.')
       return
     }
@@ -445,6 +449,7 @@ export default function BookingPage() {
         .in('status', ['pending', 'confirmed'])
 
       if (existingAppointments && existingAppointments.length > 0) {
+        haptic.error()
         setError('Este horário não está mais disponível. Por favor, escolha outro.')
         setSelectedSlot(null)
         setIsSubmitting(false)
@@ -481,6 +486,7 @@ export default function BookingPage() {
       console.log('Appointment criado:', data)
 
       // Success!
+      haptic.success()
       setSuccess(true)
       setIsSubmitting(false)
 
@@ -498,6 +504,7 @@ export default function BookingPage() {
       }, 3000)
     } catch (err) {
       console.error('Error creating appointment:', err)
+      haptic.error()
       setError('Não foi possível confirmar o agendamento. Tente novamente.')
       setIsSubmitting(false)
     }

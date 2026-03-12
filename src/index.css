@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth Scroll & iOS Momentum */
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Theme CSS Variables - Light Mode */
 :root {
   /* Backgrounds */

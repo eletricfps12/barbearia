@@ -1,3 +1,5 @@
+import { useHaptic } from '../hooks/useHaptic'
+
 /**
  * ServiceCard Component
  * 
@@ -9,12 +11,19 @@
  * Requirements: 3.2, 3.3, 3.4, 7.1, 7.2, 7.3
  */
 export default function ServiceCard({ service, isSelected, onSelect }) {
+  const haptic = useHaptic();
+  
   // Debug: verificar se description está chegando
   console.log('ServiceCard recebeu:', { 
     name: service.name, 
     description: service.description,
     hasDescription: !!service.description 
   })
+  
+  const handleSelect = () => {
+    haptic.light();
+    onSelect(service);
+  };
   
   // Format duration from minutes to readable format
   const formatDuration = (minutes) => {
@@ -39,7 +48,7 @@ export default function ServiceCard({ service, isSelected, onSelect }) {
 
   return (
     <button
-      onClick={() => onSelect(service)}
+      onClick={handleSelect}
       className={`
         w-full min-h-[44px] p-4 rounded-lg transition-all duration-200 relative
         ${isSelected 

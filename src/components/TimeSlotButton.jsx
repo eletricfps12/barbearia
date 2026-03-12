@@ -1,3 +1,5 @@
+import { useHaptic } from '../hooks/useHaptic'
+
 /**
  * TimeSlotButton Component
  * 
@@ -8,6 +10,15 @@
  * Requirements: 5.2, 5.3, 8.2, 8.5
  */
 export default function TimeSlotButton({ slot, isSelected, onSelect }) {
+  const haptic = useHaptic();
+  
+  const handleSelect = () => {
+    if (slot.available) {
+      haptic.light();
+      onSelect(slot);
+    }
+  };
+  
   // Format time to HH:mm format
   const formatTime = (time) => {
     // If time is already in HH:mm format, return as is
@@ -21,7 +32,7 @@ export default function TimeSlotButton({ slot, isSelected, onSelect }) {
 
   return (
     <button
-      onClick={() => onSelect(slot)}
+      onClick={handleSelect}
       disabled={!slot.available}
       className={`
         min-w-[88px] min-h-[44px] px-4 py-2 rounded-lg 

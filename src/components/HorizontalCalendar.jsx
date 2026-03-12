@@ -1,3 +1,5 @@
+import { useHaptic } from '../hooks/useHaptic'
+
 /**
  * HorizontalCalendar Component
  * 
@@ -12,6 +14,13 @@ export default function HorizontalCalendar({
   onDateSelect, 
   daysToShow = 14 
 }) {
+  const haptic = useHaptic();
+  
+  const handleDateSelect = (date) => {
+    haptic.light();
+    onDateSelect(date);
+  };
+  
   // Generate array of dates starting from current date
   const generateDates = () => {
     const dates = []
@@ -75,7 +84,7 @@ export default function HorizontalCalendar({
             return (
               <button
                 key={index}
-                onClick={() => onDateSelect(date)}
+                onClick={() => handleDateSelect(date)}
                 className={`
                   flex-shrink-0 flex flex-col items-center justify-center
                   min-w-[60px] min-h-[72px] px-3 py-2
