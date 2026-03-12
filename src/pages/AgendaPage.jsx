@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Zap, TrendingUp, AlertCircle } from 'lucide-react'
+import ManualBookingModal from '../components/ManualBookingModal'
 
 // Tempo limite para cancelamento com liberação de horário (em minutos)
 const CANCELLATION_THRESHOLD_MINUTES = 20
@@ -53,6 +54,12 @@ export default function AgendaPage() {
   const [showBlockModal, setShowBlockModal] = useState(false)
   const [showNoShowConfirmModal, setShowNoShowConfirmModal] = useState(false)
   const [noShowAppointment, setNoShowAppointment] = useState(null)
+  const [showManualBookingModal, setShowManualBookingModal] = useState(false)
+  const [manualBookingPrefill, setManualBookingPrefill] = useState({
+    date: null,
+    time: null,
+    barberId: null
+  })
   
   // Update current time every minute for "now" line
   useEffect(() => {
@@ -516,6 +523,36 @@ export default function AgendaPage() {
   const closeBlockModal = () => {
     setShowBlockModal(false)
     setTimeout(() => setSelectedBlock(null), 300)
+  }
+
+  /**
+   * Open manual booking modal
+   */
+  const openManualBookingModal = (slotTime = null) => {
+    setManualBookingPrefill({
+      date: selectedDate,
+      time: slotTime,
+      barberId: selectedBarber !== 'all' ? selectedBarber : null
+    })
+    setShowManualBookingModal(true)
+  }
+
+  /**
+   * Close manual booking modal
+   */
+  const closeManualBookingModal = () => {
+    setShowManualBookingModal(false)
+    setTimeout(() => {
+      setManualBookingPrefill({ date: null, time: null, barberId: null })
+    }, 300)
+  }
+
+  /**
+   * Handle successful manual booking
+   */
+  const handleManualBookingSuccess = () => {
+    fetchAppointments()
+    closeManualBookingModal()
   }
 
   /**
@@ -1268,9 +1305,7 @@ export default function AgendaPage() {
                               <button
                                 type="button"
                                 className="text-xs sm:text-sm text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 font-medium px-2 sm:px-4 py-1 sm:py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
-                                onClick={() => {
-                                  console.log('Create appointment at:', slotTime)
-                                }}
+                                onClick={() => openManualBookingModal(slotTime)}
                               >
                                 + Adicionar
                               </button>
@@ -2022,6 +2057,17 @@ export default function AgendaPage() {
           </div>
         </div>
       )}
+
+      {/* Manual Booking Modal */}
+      <ManualBookingModal
+        isOpen={showManualBookingModal}
+        onClose={closeManualBookingModal}
+        barbershopId={barbershopId}
+        prefilledDate={manualBookingPrefill.date}
+        prefilledTime={manualBookingPrefill.time}
+        prefilledBarberId={manualBookingPrefill.barberId}
+        onSuccess={handleManualBookingSuccess}
+      />
     </div>
   )
 }
