@@ -120,20 +120,29 @@ export default function BookingPage() {
           .eq('barbershop_id', barberData.barbershop_id)
           .order('price', { ascending: true })
 
-        console.log('Serviços encontrados:', servicesData, servicesError)
+        console.log('🔍 Serviços encontrados RAW:', servicesData, servicesError)
 
         if (servicesError) throw servicesError
 
         // Transformar serviços para o formato esperado
-        const transformedServices = (servicesData || []).map(service => ({
-          id: service.id,
-          name: service.name,
-          duration: service.duration_minutes,
-          price: service.price,
-          description: service.description
-        }))
+        const transformedServices = (servicesData || []).map(service => {
+          console.log('🔍 Serviço individual:', {
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            hasDescription: !!service.description
+          })
+          
+          return {
+            id: service.id,
+            name: service.name,
+            duration: service.duration_minutes,
+            price: service.price,
+            description: service.description
+          }
+        })
 
-        console.log('Serviços transformados:', transformedServices)
+        console.log('✅ Serviços transformados FINAL:', transformedServices)
 
         setServices(transformedServices)
         setIsLoading(false)

@@ -15,7 +15,8 @@ export default function ServicosPage() {
     name: '',
     duration_minutes: '',
     price: '',
-    barber_id: ''
+    barber_id: '',
+    description: ''
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -96,7 +97,8 @@ export default function ServicosPage() {
         name: service.name,
         duration_minutes: service.duration_minutes.toString(),
         price: service.price.toString(),
-        barber_id: service.barber_id || ''
+        barber_id: service.barber_id || '',
+        description: service.description || ''
       })
     } else {
       setEditingService(null)
@@ -104,7 +106,8 @@ export default function ServicosPage() {
         name: '',
         duration_minutes: '',
         price: '',
-        barber_id: ''
+        barber_id: '',
+        description: ''
       })
     }
     setIsModalOpen(true)
@@ -117,7 +120,8 @@ export default function ServicosPage() {
       name: '',
       duration_minutes: '',
       price: '',
-      barber_id: ''
+      barber_id: '',
+      description: ''
     })
   }
 
@@ -140,7 +144,8 @@ export default function ServicosPage() {
         duration_minutes: parseInt(formData.duration_minutes),
         price: parseFloat(formData.price),
         barbershop_id: barbershopId,
-        barber_id: formData.barber_id
+        barber_id: formData.barber_id,
+        description: formData.description.trim() || null
       }
 
       if (editingService) {
@@ -385,6 +390,11 @@ export default function ServicosPage() {
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                               {service.name}
                             </h3>
+                            {service.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                                {service.description}
+                              </p>
+                            )}
                           </div>
                           
                           {/* Botões de Ação */}
@@ -493,6 +503,33 @@ export default function ServicosPage() {
                     disabled={isSaving}
                     required
                   />
+                </div>
+
+                {/* Descrição do Serviço */}
+                <div>
+                  <label htmlFor="description" className="block text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                    Descrição (opcional)
+                  </label>
+                  <textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value.length <= 200) {
+                        setFormData({ ...formData, description: value })
+                      }
+                    }}
+                    placeholder="Ex: Corte tesoura com acabamento na navalha e lavagem inclusa"
+                    rows="3"
+                    maxLength="200"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                    disabled={isSaving}
+                  />
+                  <div className="flex justify-end mt-1">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formData.description.length}/200
+                    </span>
+                  </div>
                 </div>
 
                 {/* Duração - Seletor Apple Style */}

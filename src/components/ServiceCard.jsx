@@ -9,6 +9,13 @@
  * Requirements: 3.2, 3.3, 3.4, 7.1, 7.2, 7.3
  */
 export default function ServiceCard({ service, isSelected, onSelect }) {
+  // Debug: verificar se description está chegando
+  console.log('ServiceCard recebeu:', { 
+    name: service.name, 
+    description: service.description,
+    hasDescription: !!service.description 
+  })
+  
   // Format duration from minutes to readable format
   const formatDuration = (minutes) => {
     if (minutes < 60) {
@@ -55,11 +62,16 @@ export default function ServiceCard({ service, isSelected, onSelect }) {
           )}
         </div>
 
-        {/* Service Name and Duration */}
+        {/* Service Name, Description and Duration */}
         <div className="text-left flex-1">
           <h3 className={`text-lg font-semibold ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
             {service.name}
           </h3>
+          {service.description && (
+            <p className={`text-xs mt-0.5 mb-1 ${isSelected ? 'text-indigo-200' : 'text-gray-500 dark:text-gray-500'}`}>
+              {service.description}
+            </p>
+          )}
           <p className={`text-sm ${isSelected ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'}`}>
             {formatDuration(service.duration)}
           </p>
