@@ -770,99 +770,110 @@ export default function AgendaPage() {
   }
 
   /**
-   * Generate time slots for calendar view (07:00 to 22:00)
+   * Generate time slots for calendar view (07:00 to 22:00) - 30 minute intervals
    */
   const generateTimeSlots = () => {
     const slots = []
     for (let hour = 7; hour <= 22; hour++) {
       slots.push(`${String(hour).padStart(2, '0')}:00`)
+      if (hour < 22) { // Don't add :30 for the last hour
+        slots.push(`${String(hour).padStart(2, '0')}:30`)
+      }
     }
     return slots
   }
 
   /**
-   * Group appointments by time slot and organize in columns (no overlap)
+   * Group appointments by time slot and organize by barber (allows multiple barbers in same slot)
+   * Creates columns for ALL barbers (filtered or all), not just those with appointments
    */
   const organizeAppointmentsInColumns = (slotTime) => {
-    const [slotHour] = slotTime.split(':').map(Number)
+    const [slotHour, slotMinute] = slotTime.split(':').map(Number)
+    const slotTotalMinutes = slotHour * 60 + slotMinute
     
-    // Get all appointments that overlap with this hour
+    // Get all appointments that overlap with this 30-minute slot
     const overlappingAppointments = appointments.filter(apt => {
       const aptStart = new Date(apt.start_time)
       const aptEnd = new Date(apt.end_time)
-      const aptStartHour = aptStart.getHours()
-      const aptEndHour = aptEnd.getHours()
-      const aptEndMinutes = aptEnd.getMinutes()
+      const aptStartMinutes = aptStart.getHours() * 60 + aptStart.getMinutes()
+      const aptEndMinutes = aptEnd.getHours() * 60 + aptEnd.getMinutes()
       
-      // Check if appointment overlaps with this hour slot
-      return (aptStartHour <= slotHour && (aptEndHour > slotHour || (aptEndHour === slotHour && aptEndMinutes > 0)))
+      // Check if appointment overlaps with this 30-minute slot
+      return (aptStartMinutes < slotTotalMinutes + 30 && aptEndMinutes > slotTotalMinutes)
     })
     
-    // Group by barber to avoid overlap
-    const columns = []
-    overlappingAppointments.forEach(apt => {
-      // Find if there's already a column for this barber
-      let columnIndex = columns.findIndex(col => 
-        col.some(a => a.barber_id === apt.barber_id)
-      )
-      
-      if (columnIndex === -1) {
-        // Create new column
-        columns.push([apt])
-      } else {
-        // Add to existing column
-        columns[columnIndex].push(apt)
+    // Determine which barbers to show columns for
+    let barbersToShow = []
+    if (selectedBarber === 'all') {
+      // Show all barbers
+      barbersToShow = barbers.map(b => b.id)
+    } else {
+      // Show only selected barber
+      barbersToShow = [selectedBarber]
+    }
+    
+    // Create columns for each barber (even if empty)
+    const barberColumns = barbersToShow.map(barberId => {
+      const barberAppointments = overlappingAppointments.filter(apt => apt.barber_id === barberId)
+      return {
+        barberId: barberId,
+        appointments: barberAppointments,
+        isEmpty: barberAppointments.length === 0
       }
     })
     
-    return columns
+    return barberColumns
   }
 
   /**
-   * Get time blocks for a specific time slot
+   * Get time blocks for a specific time slot (30-minute intervals)
    */
   const getBlocksForSlot = (slotTime) => {
-    const [slotHour] = slotTime.split(':').map(Number)
+    const [slotHour, slotMinute] = slotTime.split(':').map(Number)
+    const slotTotalMinutes = slotHour * 60 + slotMinute
     
     return timeBlocks.filter(block => {
-      const blockHour = block.start_time.getHours()
-      const blockEndHour = block.end_time.getHours()
-      return blockHour <= slotHour && blockEndHour > slotHour
+      const blockStartMinutes = block.start_time.getHours() * 60 + block.start_time.getMinutes()
+      const blockEndMinutes = block.end_time.getHours() * 60 + block.end_time.getMinutes()
+      return blockStartMinutes < slotTotalMinutes + 30 && blockEndMinutes > slotTotalMinutes
     })
   }
 
   /**
-   * Calculate appointment position and height in calendar
+   * Calculate appointment position and height in calendar (30-minute slots)
    * FIXED: Prevents card overlap by only showing card in slots it actually occupies
    */
-  const getAppointmentStyle = (appointment, slotHour) => {
+  const getAppointmentStyle = (appointment, slotTime) => {
+    const [slotHour, slotMinute] = slotTime.split(':').map(Number)
+    const slotTotalMinutes = slotHour * 60 + slotMinute
+    
     const startTime = new Date(appointment.start_time)
     const endTime = new Date(appointment.end_time)
     
-    const startHour = startTime.getHours()
-    const startMinutes = startTime.getMinutes()
-    const endHour = endTime.getHours()
-    const endMinutes = endTime.getMinutes()
+    const startTotalMinutes = startTime.getHours() * 60 + startTime.getMinutes()
+    const endTotalMinutes = endTime.getHours() * 60 + endTime.getMinutes()
     
-    // Calculate top position relative to the slot
+    // Calculate top position relative to the 30-minute slot
     let top = 0
-    if (startHour === slotHour) {
-      top = (startMinutes / 60) * 100
+    if (startTotalMinutes >= slotTotalMinutes && startTotalMinutes < slotTotalMinutes + 30) {
+      top = ((startTotalMinutes - slotTotalMinutes) / 30) * 100
     }
     
-    // Calculate height - ONLY for the portion in THIS slot
+    // Calculate height - ONLY for the portion in THIS 30-minute slot
     let height = 0
-    if (startHour === slotHour && endHour === slotHour) {
-      // Starts and ends in same hour
-      height = ((endMinutes - startMinutes) / 60) * 100
-    } else if (startHour === slotHour) {
-      // Starts in this hour, continues to next
-      height = ((60 - startMinutes) / 60) * 100
-    } else if (endHour === slotHour) {
-      // Started in previous hour, ends in this hour
-      height = (endMinutes / 60) * 100
-    } else if (startHour < slotHour && endHour > slotHour) {
-      // Spans through this entire hour
+    const slotEnd = slotTotalMinutes + 30
+    
+    if (startTotalMinutes >= slotTotalMinutes && endTotalMinutes <= slotEnd) {
+      // Starts and ends in this slot
+      height = ((endTotalMinutes - startTotalMinutes) / 30) * 100
+    } else if (startTotalMinutes >= slotTotalMinutes && startTotalMinutes < slotEnd) {
+      // Starts in this slot, continues to next
+      height = ((slotEnd - startTotalMinutes) / 30) * 100
+    } else if (endTotalMinutes > slotTotalMinutes && endTotalMinutes <= slotEnd) {
+      // Started in previous slot, ends in this slot
+      height = ((endTotalMinutes - slotTotalMinutes) / 30) * 100
+    } else if (startTotalMinutes < slotTotalMinutes && endTotalMinutes > slotEnd) {
+      // Spans through this entire slot
       height = 100
     }
     
@@ -895,7 +906,7 @@ export default function AgendaPage() {
   }
 
   /**
-   * Check if current time is within this slot (for "now" line)
+   * Check if current time is within this slot (for "now" line) - 30-minute slots
    */
   const isCurrentTimeInSlot = (slotTime) => {
     const today = new Date()
@@ -906,14 +917,14 @@ export default function AgendaPage() {
       return { show: false, position: 0 }
     }
     
-    const [slotHour] = slotTime.split(':').map(Number)
-    const currentHour = currentTime.getHours()
-    const currentMinutes = currentTime.getMinutes()
+    const [slotHour, slotMinute] = slotTime.split(':').map(Number)
+    const slotTotalMinutes = slotHour * 60 + slotMinute
+    const currentTotalMinutes = currentTime.getHours() * 60 + currentTime.getMinutes()
     
-    if (currentHour === slotHour) {
+    if (currentTotalMinutes >= slotTotalMinutes && currentTotalMinutes < slotTotalMinutes + 30) {
       return {
         show: true,
-        position: (currentMinutes / 60) * 100
+        position: ((currentTotalMinutes - slotTotalMinutes) / 30) * 100
       }
     }
     
@@ -1146,7 +1157,6 @@ export default function AgendaPage() {
             <div className="min-w-full">
               {/* Time Slots */}
               {generateTimeSlots().map((slotTime, index) => {
-                const [slotHour] = slotTime.split(':').map(Number)
                 const appointmentColumns = organizeAppointmentsInColumns(slotTime)
                 const slotsBlocks = getBlocksForSlot(slotTime)
                 const nowLine = isCurrentTimeInSlot(slotTime)
@@ -1166,7 +1176,7 @@ export default function AgendaPage() {
                     </div>
 
                     {/* Appointments Area */}
-                    <div className="flex-1 relative min-h-[80px] sm:min-h-[100px]">
+                    <div className="flex-1 relative min-h-[40px] sm:min-h-[50px]">
                       {/* Dashed line for empty slots */}
                       {appointmentColumns.length === 0 && slotsBlocks.length === 0 && !isOutside && (
                         <div className="absolute inset-0 border-b border-dashed border-gray-200 dark:border-gray-700" style={{ top: '50%' }} />
@@ -1187,7 +1197,7 @@ export default function AgendaPage() {
 
                       {/* Time Blocks (Bloqueios) */}
                       {slotsBlocks.map((block, blockIndex) => {
-                        const style = getAppointmentStyle(block, slotHour)
+                        const style = getAppointmentStyle(block, slotTime)
                         const durationMinutes = (block.end_time - block.start_time) / (1000 * 60)
                         const isSmallCard = durationMinutes < 30
                         
@@ -1221,17 +1231,35 @@ export default function AgendaPage() {
                         )
                       })}
 
-                      {/* Appointment Columns (No Overlap) - Mobile Optimized */}
+                      {/* Appointment Columns by Barber - Mobile Optimized */}
                       <div className="flex h-full" style={{ minWidth: totalColumns > 2 ? `${totalColumns * 150}px` : '100%' }}>
-                        {appointmentColumns.length > 0 ? (
-                          appointmentColumns.map((column, colIndex) => (
+                        {appointmentColumns.map((column, colIndex) => {
+                          const barberId = column.barberId
+                          const barberInfo = barbers.find(b => b.id === barberId)
+                          const hasAppointments = column.appointments.length > 0
+                          
+                          return (
                             <div 
-                              key={colIndex}
-                              className="relative"
+                              key={barberId || colIndex}
+                              className="relative group"
                               style={{ width: `${100 / totalColumns}%`, minWidth: totalColumns > 2 ? '150px' : 'auto' }}
                             >
-                              {column.map((appointment) => {
-                                const style = getAppointmentStyle(appointment, slotHour)
+                              {/* Add button for this barber column (always shows on hover) */}
+                              {!isOutside && (
+                                <div className={`absolute inset-0 flex items-center justify-center ${hasAppointments ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 hover:opacity-100'} transition-opacity z-10 pointer-events-none`}>
+                                  <button
+                                    type="button"
+                                    className="text-xs sm:text-sm text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 font-medium px-2 sm:px-4 py-1 sm:py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all pointer-events-auto"
+                                    onClick={() => openManualBookingModal(slotTime)}
+                                  >
+                                    + Adicionar
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {/* Render appointments for this barber */}
+                              {column.appointments.map((appointment) => {
+                                const style = getAppointmentStyle(appointment, slotTime)
                                 const colors = getBarberColor(appointment.barbers?.color, appointment.status)
                                 const durationMinutes = (new Date(appointment.end_time) - new Date(appointment.start_time)) / (1000 * 60)
                                 const isSmallCard = durationMinutes < 30
@@ -1297,21 +1325,8 @@ export default function AgendaPage() {
                                 )
                               })}
                             </div>
-                          ))
-                        ) : (
-                          // Empty slot
-                          <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                            {!isOutside && (
-                              <button
-                                type="button"
-                                className="text-xs sm:text-sm text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 font-medium px-2 sm:px-4 py-1 sm:py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
-                                onClick={() => openManualBookingModal(slotTime)}
-                              >
-                                + Adicionar
-                              </button>
-                            )}
-                          </div>
-                        )}
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
